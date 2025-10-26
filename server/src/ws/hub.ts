@@ -1,0 +1,300 @@
+import type { WebSocket } from '@fastify/websocket';
+import type { FastifyBaseLogger } from 'fastify';
+import bcrypt from 'bcrypt';
+import { PrismaClient } from '@prisma/client';
+import {
+  ClientMessageSchema,
+  type ClientMessage,
+  type ServerMessage,
+  type TokenMessage,
+  type CompleteMessage,
+} from './schemas.js';
+
+interface ParticipantConnection {
+  participantId: string;
+  sessionId: string;
+  ws: WebSocket;
+  lastSeq: Map<number, number>; // round -> last seq
+  lastSeen: Date;
+}
+
+export class WebSocketHub {
+  private connections = new Map<string, ParticipantConnection>();
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private tokenBuffer = new Map<string, Map<number, string[]>>(); // participantId -> round -> tokens
+
+  constructor(
+    private prisma: PrismaClient,
+    private logger: FastifyBaseLogger
+  ) {
+    this.startHeartbeat();
+  }
+
+  async handleConnection(ws: WebSocket, sessionId?: string) {
+    const connId = `conn-${Date.now()}-${Math.random()}`;
+
+    ws.on('message', async (data) => {
+      try {
+        const raw = JSON.parse(data.toString());
+        const message = ClientMessageSchema.parse(raw);
+
+        await this.handleMessage(connId, ws, message);
+      } catch (error) {
+        this.logger.error({ error, connId }, 'Failed to parse message');
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+      }
+    });
+
+    ws.on('close', () => {
+      this.handleDisconnection(connId);
+    });
+
+    ws.on('error', (error) => {
+      this.logger.error({ error, connId }, 'WebSocket error');
+    });
+  }
+
+  private async handleMessage(connId: string, ws: WebSocket, message: ClientMessage) {
+    switch (message.type) {
+      case 'register':
+        await this.handleRegister(connId, ws, message);
+        break;
+      case 'token':
+        await this.handleToken(message);
+        break;
+      case 'complete':
+        await this.handleComplete(message);
+        break;
+      case 'error':
+        this.logger.error({ message }, 'Client error');
+        break;
+    }
+  }
+
+  private async handleRegister(
+    connId: string,
+    ws: WebSocket,
+    message: ClientMessage & { type: 'register' }
+  ) {
+    try {
+      // Find active session
+      const session = await this.prisma.session.findFirst({
+        where: { status: 'active' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!session) {
+        ws.send(JSON.stringify({ type: 'error', message: 'No active session' }));
+        return;
+      }
+
+      // Verify PIN
+      const pinValid = await bcrypt.compare(message.pin, session.pinHash);
+      if (!pinValid) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid PIN' }));
+        return;
+      }
+
+      // Create or update participant
+      await this.prisma.participant.upsert({
+        where: { id: message.participant_id },
+        create: {
+          id: message.participant_id,
+          sessionId: session.id,
+          nickname: message.nickname,
+          runner: message.runner,
+          model: message.model,
+          lastSeen: new Date(),
+        },
+        update: {
+          lastSeen: new Date(),
+          runner: message.runner,
+          model: message.model,
+        },
+      });
+
+      // Store connection
+      this.connections.set(connId, {
+        participantId: message.participant_id,
+        sessionId: session.id,
+        ws,
+        lastSeq: new Map(),
+        lastSeen: new Date(),
+      });
+
+      this.logger.info(
+        { participantId: message.participant_id, sessionId: session.id },
+        'Participant registered'
+      );
+
+      ws.send(JSON.stringify({ type: 'registered', session_id: session.id }));
+    } catch (error) {
+      this.logger.error({ error }, 'Registration failed');
+      ws.send(JSON.stringify({ type: 'error', message: 'Registration failed' }));
+    }
+  }
+
+  private async handleToken(message: TokenMessage) {
+    const participantKey = message.participant_id;
+
+    if (!this.tokenBuffer.has(participantKey)) {
+      this.tokenBuffer.set(participantKey, new Map());
+    }
+
+    const roundBuffer = this.tokenBuffer.get(participantKey)!;
+    if (!roundBuffer.has(message.round)) {
+      roundBuffer.set(message.round, []);
+    }
+
+    const tokens = roundBuffer.get(message.round)!;
+
+    // Validate sequence
+    if (message.seq !== tokens.length) {
+      this.logger.warn(
+        { participantId: message.participant_id, expected: tokens.length, got: message.seq },
+        'Sequence mismatch'
+      );
+      return;
+    }
+
+    tokens.push(message.content);
+
+    // Broadcast to telao
+    this.broadcastToTelao({
+      type: 'token_update',
+      participant_id: message.participant_id,
+      round: message.round,
+      seq: message.seq,
+      content: message.content,
+      total_tokens: tokens.length,
+    });
+  }
+
+  private async handleComplete(message: CompleteMessage) {
+    try {
+      const round = await this.prisma.round.findFirst({
+        where: {
+          index: message.round,
+        },
+        include: { session: true },
+      });
+
+      if (!round) {
+        this.logger.error({ round: message.round }, 'Round not found');
+        return;
+      }
+
+      const tpsAvg = message.duration_ms > 0
+        ? (message.tokens / message.duration_ms) * 1000
+        : null;
+
+      await this.prisma.metrics.upsert({
+        where: {
+          roundId_participantId: {
+            roundId: round.id,
+            participantId: message.participant_id,
+          },
+        },
+        create: {
+          roundId: round.id,
+          participantId: message.participant_id,
+          tokens: message.tokens,
+          latencyFirstTokenMs: message.latency_ms_first_token,
+          durationMs: message.duration_ms,
+          tpsAvg,
+          modelInfo: message.model_info ? JSON.stringify(message.model_info) : null,
+        },
+        update: {
+          tokens: message.tokens,
+          latencyFirstTokenMs: message.latency_ms_first_token,
+          durationMs: message.duration_ms,
+          tpsAvg,
+          modelInfo: message.model_info ? JSON.stringify(message.model_info) : null,
+        },
+      });
+
+      this.logger.info(
+        { participantId: message.participant_id, round: message.round, tokens: message.tokens },
+        'Completion recorded'
+      );
+
+      // Broadcast completion
+      this.broadcastToTelao({
+        type: 'completion',
+        participant_id: message.participant_id,
+        round: message.round,
+        tokens: message.tokens,
+        duration_ms: message.duration_ms,
+      });
+    } catch (error) {
+      this.logger.error({ error }, 'Failed to record completion');
+    }
+  }
+
+  private handleDisconnection(connId: string) {
+    const conn = this.connections.get(connId);
+    if (conn) {
+      this.logger.info({ participantId: conn.participantId }, 'Participant disconnected');
+      this.connections.delete(connId);
+    }
+  }
+
+  broadcast(message: ServerMessage) {
+    const payload = JSON.stringify(message);
+    for (const conn of this.connections.values()) {
+      try {
+        conn.ws.send(payload);
+      } catch (error) {
+        this.logger.error({ error, participantId: conn.participantId }, 'Broadcast failed');
+      }
+    }
+  }
+
+  broadcastToTelao(message: any) {
+    // In a real implementation, this would broadcast to telao-specific connections
+    // For now, we'll use the same mechanism
+    this.logger.debug({ message }, 'Broadcasting to telao');
+  }
+
+  private startHeartbeat() {
+    this.heartbeatInterval = setInterval(() => {
+      this.broadcast({
+        type: 'heartbeat',
+        ts: Date.now(),
+      });
+    }, 30000); // 30s
+  }
+
+  async getActiveParticipants(sessionId: string) {
+    return this.prisma.participant.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async getCurrentRoundTokens(roundIndex: number) {
+    const result = new Map<string, string[]>();
+
+    for (const [participantId, rounds] of this.tokenBuffer) {
+      const tokens = rounds.get(roundIndex);
+      if (tokens) {
+        result.set(participantId, tokens);
+      }
+    }
+
+    return result;
+  }
+
+  cleanup() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+
+    for (const conn of this.connections.values()) {
+      conn.ws.close();
+    }
+
+    this.connections.clear();
+    this.tokenBuffer.clear();
+  }
+}

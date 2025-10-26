@@ -1,0 +1,31 @@
+{
+  "name": "gambiarra-llm-club-arena",
+  "version": "1.0.0",
+  "description": "Arena LAN para competições criativas com LLMs rodando localmente",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client",
+    "telao"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "simulate": "pnpm --filter client simulate",
+    "seed": "pnpm --filter server seed",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  },
+  "keywords": [
+    "llm",
+    "arena",
+    "gambiarra",
+    "local",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/production.db
+      - CORS_ORIGIN=*
+    volumes:
+      - server-data:/app/data
+    networks:
+      - gambiarra-net
+    restart: unless-stopped
+
+  telao:
+    build:
+      context: ./telao
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+    networks:
+      - gambiarra-net
+    restart: unless-stopped
+
+volumes:
+  server-data:
+
+networks:
+  gambiarra-net:
+    driver: bridge

@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id           String        @id @default(uuid())
+  createdAt    DateTime      @default(now())
+  pinHash      String
+  status       String        @default("active") // active, ended
+  participants Participant[]
+  rounds       Round[]
+
+  @@map("sessions")
+}
+
+model Participant {
+  id         String    @id
+  sessionId  String
+  nickname   String
+  runner     String
+  model      String
+  createdAt  DateTime  @default(now())
+  lastSeen   DateTime  @default(now())
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  metrics    Metrics[]
+  votes      Vote[]
+
+  @@map("participants")
+}
+
+model Round {
+  id         String    @id @default(uuid())
+  sessionId  String
+  index      Int
+  prompt     String
+  maxTokens  Int       @default(400)
+  temperature Float    @default(0.8)
+  deadlineMs Int       @default(90000)
+  seed       Int?
+  startedAt  DateTime?
+  endedAt    DateTime?
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  metrics    Metrics[]
+  votes      Vote[]
+
+  @@unique([sessionId, index])
+  @@map("rounds")
+}
+
+model Metrics {
+  id                    String      @id @default(uuid())
+  roundId               String
+  participantId         String
+  tokens                Int
+  latencyFirstTokenMs   Int?
+  durationMs            Int
+  tpsAvg                Float?
+  modelInfo             String?     // JSON string
+  createdAt             DateTime    @default(now())
+  round                 Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant           Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, participantId])
+  @@map("metrics")
+}
+
+model Vote {
+  id            String      @id @default(uuid())
+  roundId       String
+  voterHash     String
+  participantId String
+  score         Int
+  createdAt     DateTime    @default(now())
+  round         Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, voterHash, participantId])
+  @@map("votes")
+}
