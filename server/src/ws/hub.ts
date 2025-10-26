@@ -3,11 +3,12 @@ import type { FastifyBaseLogger } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import {
-  ClientMessageSchema,
   type ClientMessage,
   type ServerMessage,
   type TokenMessage,
   type CompleteMessage,
+  ExtendedClientMessageSchema,
+  type ExtendedClientMessage,
 } from './schemas.js';
 
 interface ParticipantConnection {
@@ -20,6 +21,7 @@ interface ParticipantConnection {
 
 export class WebSocketHub {
   private connections = new Map<string, ParticipantConnection>();
+  private telaoConnections = new Map<string, WebSocket>();
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private tokenBuffer = new Map<string, Map<number, string[]>>(); // participantId -> round -> tokens
 
@@ -36,7 +38,8 @@ export class WebSocketHub {
     ws.on('message', async (data) => {
       try {
         const raw = JSON.parse(data.toString());
-        const message = ClientMessageSchema.parse(raw);
+        // Accept both participant messages and telao registrations
+        const message = ExtendedClientMessageSchema.parse(raw) as ExtendedClientMessage;
 
         await this.handleMessage(connId, ws, message);
       } catch (error) {
@@ -54,8 +57,9 @@ export class WebSocketHub {
     });
   }
 
-  private async handleMessage(connId: string, ws: WebSocket, message: ClientMessage) {
-    switch (message.type) {
+  private async handleMessage(connId: string, ws: WebSocket, message: ExtendedClientMessage) {
+  // message may be ExtendedClientMessage at runtime; narrow by type
+  switch (message.type) {
       case 'register':
         await this.handleRegister(connId, ws, message);
         break;
@@ -65,9 +69,25 @@ export class WebSocketHub {
       case 'complete':
         await this.handleComplete(message);
         break;
+      case 'telao_register':
+        await this.handleTelaoRegister(connId, ws, message as any);
+        break;
       case 'error':
         this.logger.error({ message }, 'Client error');
         break;
+    }
+  }
+
+  private async handleTelaoRegister(connId: string, ws: WebSocket, message: any) {
+    // Register this websocket as a telao connection
+    this.telaoConnections.set(connId, ws);
+
+    this.logger.info({ connId, view: message.view }, 'Telao registered');
+
+    try {
+      ws.send(JSON.stringify({ type: 'registered_telao', view: message.view || 'arena' }));
+    } catch (error) {
+      this.logger.error({ error }, 'Failed to ack telao register');
     }
   }
 
@@ -96,7 +116,7 @@ export class WebSocketHub {
       }
 
       // Create or update participant
-      await this.prisma.participant.upsert({
+      const participantRecord = await this.prisma.participant.upsert({
         where: { id: message.participant_id },
         create: {
           id: message.participant_id,
@@ -105,11 +125,13 @@ export class WebSocketHub {
           runner: message.runner,
           model: message.model,
           lastSeen: new Date(),
+          connected: true,
         },
         update: {
           lastSeen: new Date(),
           runner: message.runner,
           model: message.model,
+          connected: true,
         },
       });
 
@@ -126,6 +148,23 @@ export class WebSocketHub {
         { participantId: message.participant_id, sessionId: session.id },
         'Participant registered'
       );
+
+      // Notify telao about the new/updated participant so UI can show immediately
+      try {
+        this.broadcastToTelao({
+          type: 'participant_registered',
+          participant: {
+            id: participantRecord.id,
+            nickname: participantRecord.nickname,
+            runner: participantRecord.runner,
+            model: participantRecord.model,
+            lastSeen: participantRecord.lastSeen,
+            connected: true,
+          },
+        });
+      } catch (err) {
+        this.logger.debug({ err }, 'Failed to broadcast participant_registered');
+      }
 
       ws.send(JSON.stringify({ type: 'registered', session_id: session.id }));
     } catch (error) {
@@ -231,11 +270,35 @@ export class WebSocketHub {
     }
   }
 
-  private handleDisconnection(connId: string) {
+  private async handleDisconnection(connId: string) {
     const conn = this.connections.get(connId);
     if (conn) {
       this.logger.info({ participantId: conn.participantId }, 'Participant disconnected');
+
+      // Update lastSeen and connected=false in the database so frontends can detect offline participants
+      try {
+        await this.prisma.participant.update({
+          where: { id: conn.participantId },
+          data: { lastSeen: new Date(), connected: false },
+        });
+
+        // Notify telao (or any pollers) that participant updated
+        this.broadcastToTelao({
+          type: 'participant_disconnected',
+          participant_id: conn.participantId,
+          ts: Date.now(),
+        });
+      } catch (error) {
+        this.logger.error({ error, participantId: conn.participantId }, 'Failed to update participant lastSeen/connected on disconnect');
+      }
+
       this.connections.delete(connId);
+    }
+
+    // Also remove from telao connections if present
+    if (this.telaoConnections.has(connId)) {
+      this.logger.info({ connId }, 'Telao disconnected');
+      this.telaoConnections.delete(connId);
     }
   }
 
@@ -251,9 +314,15 @@ export class WebSocketHub {
   }
 
   broadcastToTelao(message: any) {
-    // In a real implementation, this would broadcast to telao-specific connections
-    // For now, we'll use the same mechanism
-    this.logger.debug({ message }, 'Broadcasting to telao');
+    const payload = JSON.stringify(message);
+    for (const [id, ws] of this.telaoConnections.entries()) {
+      try {
+        ws.send(payload);
+      } catch (error) {
+        this.logger.error({ error, telaoConn: id }, 'Failed to send message to telao');
+      }
+    }
+    this.logger.debug({ count: this.telaoConnections.size }, 'Broadcasted to telao connections');
   }
 
   private startHeartbeat() {

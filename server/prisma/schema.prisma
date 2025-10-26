@@ -27,6 +27,7 @@ model Participant {
   nickname   String
   runner     String
   model      String
+  connected  Boolean   @default(false)
   createdAt  DateTime  @default(now())
   lastSeen   DateTime  @default(now())
   session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)

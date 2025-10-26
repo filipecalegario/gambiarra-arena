@@ -7,6 +7,8 @@ interface Participant {
   nickname: string;
   runner: string;
   model: string;
+  lastSeen?: string;
+  connected?: boolean;
 }
 
 interface Round {
@@ -50,12 +52,24 @@ function Arena() {
   const [votingUrl, setVotingUrl] = useState('');
 
   useEffect(() => {
+    const ONLINE_THRESHOLD_MS = 60_000; // 60s: consider participant online if seen within this window
     // Fetch session data periodically
     const fetchSession = () => {
       fetch('/api/session')
         .then((res) => res.json())
         .then((data) => {
-          setParticipants(data.participants || []);
+          // Prefer explicit `connected` flag; fall back to lastSeen if absent
+          const parts = (data.participants || []).filter((p: Participant) => {
+            if (typeof p.connected === 'boolean') return p.connected;
+            try {
+              if (!p.lastSeen) return false;
+              return Date.now() - new Date(p.lastSeen).getTime() < ONLINE_THRESHOLD_MS;
+            } catch (e) {
+              return false;
+            }
+          });
+
+          setParticipants(parts);
         })
         .catch((err) => console.error('Failed to fetch session:', err));
     };
@@ -100,6 +114,90 @@ function Arena() {
 
   // WebSocket for live updates (optional enhancement)
   // This would listen to the /ws endpoint for real-time token updates
+  useEffect(() => {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${wsProtocol}://${window.location.host}/ws`;
+    let ws: WebSocket | null = null;
+
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (err) {
+      console.error('Failed to open WebSocket to', wsUrl, err);
+      return;
+    }
+
+    ws.addEventListener('open', () => {
+      // Register as telao
+      ws!.send(JSON.stringify({ type: 'telao_register', view: 'arena' }));
+    });
+
+    ws.addEventListener('message', (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+
+        switch (msg.type) {
+          case 'token_update': {
+            const pid = msg.participant_id as string;
+            setParticipantStates((prev) => {
+              const next = { ...prev };
+              const state = next[pid] || { tokens: 0, isGenerating: false, content: [] };
+              state.tokens = msg.total_tokens;
+              state.isGenerating = true;
+              state.content = [...(state.content || []), msg.content];
+              next[pid] = state;
+              return next;
+            });
+            break;
+          }
+          case 'completion': {
+            const pid = msg.participant_id as string;
+            setParticipantStates((prev) => {
+              const next = { ...prev };
+              const state = next[pid] || { tokens: 0, isGenerating: false, content: [] };
+              state.tokens = msg.tokens;
+              state.isGenerating = false;
+              next[pid] = state;
+              return next;
+            });
+            break;
+          }
+          case 'participant_registered': {
+            const p = msg.participant as Participant;
+            setParticipants((prev) => {
+              const exists = prev.find((x) => x.id === p.id);
+              if (exists) {
+                return prev.map((x) => (x.id === p.id ? { ...x, ...p } : x));
+              }
+              return [...prev, p];
+            });
+            break;
+          }
+          case 'participant_disconnected': {
+            const pid = msg.participant_id as string;
+            setParticipants((prev) => prev.filter((p) => p.id !== pid));
+            setParticipantStates((prev) => {
+              const next = { ...prev };
+              delete next[pid];
+              return next;
+            });
+            break;
+          }
+          default:
+            break;
+        }
+      } catch (e) {
+        console.error('Invalid WS message', e);
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      console.info('Telao WS closed');
+    });
+
+    return () => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen p-8">

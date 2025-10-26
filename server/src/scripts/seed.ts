@@ -33,7 +33,7 @@ async function seed() {
     data: {
       sessionId: session.id,
       index: 1,
-      prompt: 'Escreva uma poesia em métrica de xote pernambucano sobre inteligência artificial',
+      prompt: 'Escreva um galope a beira mar.',
       maxTokens: 400,
       temperature: 0.8,
       deadlineMs: 90000,

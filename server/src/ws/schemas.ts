@@ -69,6 +69,20 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   ErrorMessageSchema,
 ]);
 
+export const TelaoRegisterMessageSchema = z.object({
+  type: z.literal('telao_register'),
+  view: z.string().optional(),
+});
+
+// Extend client message union to accept telao registrations
+export const ExtendedClientMessageSchema = z.discriminatedUnion('type', [
+  RegisterMessageSchema,
+  TokenMessageSchema,
+  CompleteMessageSchema,
+  ErrorMessageSchema,
+  TelaoRegisterMessageSchema,
+]);
+
 // Vote messages
 export const VoteMessageSchema = z.object({
   type: z.literal('vote'),
@@ -88,5 +102,6 @@ export type TokenMessage = z.infer<typeof TokenMessageSchema>;
 export type CompleteMessage = z.infer<typeof CompleteMessageSchema>;
 export type ErrorMessage = z.infer<typeof ErrorMessageSchema>;
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
+export type ExtendedClientMessage = z.infer<typeof ExtendedClientMessageSchema>;
 
 export type VoteMessage = z.infer<typeof VoteMessageSchema>;
