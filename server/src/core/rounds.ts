@@ -75,7 +75,7 @@ export class RoundManager {
       max_tokens: round.maxTokens,
       temperature: round.temperature,
       deadline_ms: round.deadlineMs,
-      seed: round.seed,
+      seed: round.seed ?? undefined,
     });
 
     this.logger.info({ roundId, index: round.index }, 'Round started');

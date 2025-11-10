@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation
+
+- **README.md** (Portuguese): Main user-facing documentation
+- **README_EN.md** (English): English version of the README
+- **CLAUDE.md** (This file): Developer documentation for Claude Code
+
 ## Project Overview
 
 **Gambiarra LLM Club Arena Local** - A LAN-based arena for creative competitions using locally-run LLMs. Inspired by the Homebrew Computer Club, this platform celebrates creative solutions ("gambiarras") and community over pure performance benchmarks.
@@ -146,17 +152,76 @@ Server config via environment variables (see `server/.env.example`):
 
 ## Deployment
 
-**Development:**
+### Development
+
 ```bash
 pnpm dev  # Runs all workspaces in parallel
 ```
 
-**Production:**
+### Production with Docker (Recommended)
+
+**Quick Start:**
 ```bash
-docker compose up --build
-# Server: http://localhost:3000
-# Telão: http://localhost:5173 (nginx)
+docker compose up
 ```
+
+The application will be available at:
+- Server: http://localhost:3000
+- Telão: http://localhost:5173 (nginx)
+- Health check: http://localhost:3000/health
+
+**Docker Setup Details:**
+
+1. **Monorepo-aware build**: Dockerfiles handle pnpm workspace correctly
+2. **Multi-stage builds**: Separate builder and production stages for optimization
+3. **Prisma binary targets**: Configured for `linux-musl-arm64-openssl-3.0.x` (Alpine 3.22)
+4. **Health checks**: Server has built-in health endpoint for container orchestration
+5. **Volume persistence**: Server data is persisted in `server-data` volume
+
+**Docker Commands:**
+```bash
+# Build and start in foreground
+docker compose up --build
+
+# Start in background (detached)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# View logs for specific service
+docker compose logs -f server
+docker compose logs -f telao
+
+# Stop containers
+docker compose down
+
+# Stop and remove volumes
+docker compose down -v
+
+# Restart after code changes
+docker compose up --build
+```
+
+**Architecture:**
+- **Server Container**: Node.js 20 Alpine with Fastify, SQLite, Prisma
+- **Telão Container**: nginx Alpine serving static React build
+- **Network**: Both containers on `gambiarra-net` bridge network
+- **Health Check**: Server monitored via `wget` on `/health` endpoint
+- **Startup**: Telão waits for server to be healthy before starting
+
+**Environment Variables:**
+Configure via `docker-compose.yml`:
+- `DATABASE_URL`: SQLite path (default: `/monorepo/server/data/production.db`)
+- `CORS_ORIGIN`: CORS configuration (default: `*`)
+- `PORT`: Server port (default: `3000`)
+- `HOST`: Server host (default: `0.0.0.0`)
+
+**Troubleshooting:**
+- If build fails, check Docker logs: `docker compose logs`
+- Prisma issues: Ensure `binaryTargets` in `schema.prisma` matches your architecture
+- Permission issues: Check volume mounts in `docker-compose.yml`
+- Container won't start: Check healthcheck logs with `docker inspect`
 
 ## Quick Start for New Session
 

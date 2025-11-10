@@ -1,30 +1,38 @@
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /monorepo
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (specific version to match lockfile)
+RUN npm install -g pnpm@8.11.0
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy monorepo workspace files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Copy telao package.json
+COPY telao/package.json ./telao/
 
-# Copy source
-COPY . .
+# Install dependencies for entire monorepo
+RUN pnpm install --frozen-lockfile --filter @gambiarra/telao...
 
-# Build
+# Copy telao source
+COPY telao ./telao
+
+# Build with environment variables
+WORKDIR /monorepo/telao
+ARG VITE_API_URL
+ARG VITE_WS_URL
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_WS_URL=${VITE_WS_URL}
 RUN pnpm build
 
 # Production image with nginx
 FROM nginx:alpine
 
 # Copy built files
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /monorepo/telao/dist /usr/share/nginx/html
 
 # Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY telao/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

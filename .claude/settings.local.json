@@ -3,7 +3,13 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(tree:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(docker compose:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(pnpm build:*)",
+      "Bash(docker run:*)",
+      "Bash(curl:*)",
+      "Bash(pnpm dev:*)"
     ],
     "deny": [],
     "ask": []

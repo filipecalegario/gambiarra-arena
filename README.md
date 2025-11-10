@@ -1,5 +1,7 @@
 # 🎮 Gambiarra LLM Club Arena Local
 
+**[English Version](README_EN.md)**
+
 Arena em LAN para competições criativas com LLMs rodando localmente nos computadores dos participantes.
 
 ## Sobre o Clube
@@ -77,17 +79,50 @@ Além do servidor Node.js/TypeScript, oferecemos uma implementação completa em
 
 ## Início Rápido
 
+### 🐳 Opção 1: Docker (Recomendado - Mais Fácil!)
+
+**Apenas um comando para rodar tudo:**
+
+```bash
+docker compose up
+```
+
+Pronto! 🎉 A aplicação completa estará rodando em:
+- **Servidor:** http://localhost:3000
+- **Telão (Arena):** http://localhost:5173
+- **Votação:** http://localhost:5173?view=voting
+- **Placar:** http://localhost:5173?view=scoreboard
+
+**Pré-requisitos:**
+- Docker e Docker Compose instalados
+
+**Comandos úteis:**
+```bash
+# Rodar em background
+docker compose up -d
+
+# Ver logs
+docker compose logs -f
+
+# Parar
+docker compose down
+
+# Reconstruir após mudanças
+docker compose up --build
+```
+
+### 💻 Opção 2: Desenvolvimento Local
+
 **🎯 Primeira vez?** Siga o [PASSO_A_PASSO.md](PASSO_A_PASSO.md) - um guia completo do zero!
 
 **⚡ Já conhece o projeto?** Use o [QUICKSTART.md](QUICKSTART.md) - versão resumida.
 
-### Pré-requisitos
-
+**Pré-requisitos:**
 - Node.js 20+
 - pnpm 8+
 - Ollama ou LM Studio (opcional, para usar LLMs reais)
 
-### Instalação
+**Instalação:**
 
 ```bash
 # Instalar dependências
@@ -100,7 +135,7 @@ pnpm --filter @gambiarra/server db:migrate
 pnpm --filter @gambiarra/server seed
 ```
 
-### Desenvolvimento
+**Desenvolvimento:**
 
 ```bash
 # Iniciar todos os serviços (servidor + telão)
@@ -190,19 +225,6 @@ Abra http://localhost:5173?view=voting ou escaneie o QR code no telão.
 
 ```bash
 curl http://localhost:3000/export.csv > resultados.csv
-```
-
-## Produção com Docker
-
-```bash
-# Build e iniciar
-docker compose up --build
-
-# Servidor: http://localhost:3000
-# Telão:
-#   - Arena: http://localhost:5173
-#   - Votação: http://localhost:5173?view=voting
-#   - Placar: http://localhost:5173?view=scoreboard
 ```
 
 ## Estrutura do Projeto

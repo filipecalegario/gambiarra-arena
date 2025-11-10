@@ -315,6 +315,13 @@ export class WebSocketHub {
 
   broadcastToTelao(message: any) {
     const payload = JSON.stringify(message);
+    const telaoCount = this.telaoConnections.size;
+
+    if (telaoCount === 0) {
+      this.logger.warn({ messageType: message.type }, 'No telao connections to broadcast to');
+      return;
+    }
+
     for (const [id, ws] of this.telaoConnections.entries()) {
       try {
         ws.send(payload);
@@ -322,7 +329,17 @@ export class WebSocketHub {
         this.logger.error({ error, telaoConn: id }, 'Failed to send message to telao');
       }
     }
-    this.logger.debug({ count: this.telaoConnections.size }, 'Broadcasted to telao connections');
+
+    // Log token_update broadcasts at info level for debugging
+    if (message.type === 'token_update') {
+      this.logger.info({
+        participantId: message.participant_id,
+        seq: message.seq,
+        telaoCount
+      }, 'Broadcast token_update to telao');
+    } else {
+      this.logger.debug({ messageType: message.type, telaoCount }, 'Broadcasted to telao connections');
+    }
   }
 
   private startHeartbeat() {

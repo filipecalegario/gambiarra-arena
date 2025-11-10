@@ -1,20 +1,24 @@
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /monorepo
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (specific version to match lockfile)
+RUN npm install -g pnpm@8.11.0
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy monorepo workspace files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Copy server package.json
+COPY server/package.json ./server/
 
-# Copy source
-COPY . .
+# Install dependencies for entire monorepo
+RUN pnpm install --frozen-lockfile --filter @gambiarra/server...
+
+# Copy server source
+COPY server ./server
 
 # Generate Prisma client
+WORKDIR /monorepo/server
 RUN pnpm db:generate
 
 # Build
@@ -23,26 +27,32 @@ RUN pnpm build
 # Production image
 FROM node:20-alpine
 
-WORKDIR /app
+WORKDIR /monorepo
 
-RUN npm install -g pnpm
+# Install pnpm (specific version to match lockfile), wget for healthcheck, and OpenSSL for Prisma
+RUN npm install -g pnpm@8.11.0 && \
+    apk add --no-cache wget openssl-dev openssl
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy monorepo workspace files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY server/package.json ./server/
 
 # Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile --filter @gambiarra/server...
 
-# Copy built files and Prisma schema
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/prisma ./prisma
+# Copy built files, Prisma schema, and generated Prisma Client from builder
+COPY --from=builder /monorepo/server/dist ./server/dist
+COPY --from=builder /monorepo/server/prisma ./server/prisma
+COPY --from=builder /monorepo/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma ./node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma
 
 # Create data directory
-RUN mkdir -p /app/data
+RUN mkdir -p /monorepo/server/data
+
+# Set working directory to server
+WORKDIR /monorepo/server
 
 # Expose port
 EXPOSE 3000
 
 # Run migrations and start
-CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
