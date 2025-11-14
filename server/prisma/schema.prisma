@@ -67,6 +67,7 @@ model Metrics {
   durationMs            Int
   tpsAvg                Float?
   modelInfo             String?     // JSON string
+  generatedContent      String?     // Full generated response
   createdAt             DateTime    @default(now())
   round                 Round       @relation(fields: [roundId], references: [id], onDelete: Cascade)
   participant           Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)

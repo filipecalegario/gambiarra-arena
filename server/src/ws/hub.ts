@@ -227,6 +227,11 @@ export class WebSocketHub {
         ? (message.tokens / message.duration_ms) * 1000
         : null;
 
+      // Get generated content from token buffer
+      const participantTokens = this.tokenBuffer.get(message.participant_id);
+      const roundTokens = participantTokens?.get(message.round);
+      const generatedContent = roundTokens ? roundTokens.join('') : null;
+
       await this.prisma.metrics.upsert({
         where: {
           roundId_participantId: {
@@ -242,6 +247,7 @@ export class WebSocketHub {
           durationMs: message.duration_ms,
           tpsAvg,
           modelInfo: message.model_info ? JSON.stringify(message.model_info) : null,
+          generatedContent,
         },
         update: {
           tokens: message.tokens,
@@ -249,6 +255,7 @@ export class WebSocketHub {
           durationMs: message.duration_ms,
           tpsAvg,
           modelInfo: message.model_info ? JSON.stringify(message.model_info) : null,
+          generatedContent,
         },
       });
 

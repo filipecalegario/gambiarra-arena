@@ -53,8 +53,19 @@ export class MetricsManager {
 
     // Header
     rows.push(
-      'round,participant_id,nickname,tokens,latency_first_token_ms,duration_ms,tps_avg,votes,avg_score'
+      'round,round_started_at,round_ended_at,participant_id,nickname,tokens,latency_first_token_ms,duration_ms,tps_avg,votes,avg_score,generated_content'
     );
+
+    // Helper to escape CSV content
+    const escapeCsv = (value: string | null | undefined): string => {
+      if (!value) return '';
+      // Escape double quotes and wrap in quotes if contains comma, newline, or quote
+      const escaped = value.replace(/"/g, '""');
+      if (escaped.includes(',') || escaped.includes('\n') || escaped.includes('"')) {
+        return `"${escaped}"`;
+      }
+      return escaped;
+    };
 
     // Data
     for (const round of rounds) {
@@ -71,14 +82,17 @@ export class MetricsManager {
         rows.push(
           [
             round.index,
+            round.startedAt ? round.startedAt.toISOString() : '',
+            round.endedAt ? round.endedAt.toISOString() : '',
             metric.participantId,
-            metric.participant.nickname,
+            escapeCsv(metric.participant.nickname),
             metric.tokens,
             metric.latencyFirstTokenMs ?? '',
             metric.durationMs,
             metric.tpsAvg?.toFixed(2) ?? '',
             voteCount,
             avgScore.toFixed(2),
+            escapeCsv(metric.generatedContent),
           ].join(',')
         );
       }

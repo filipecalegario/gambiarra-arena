@@ -16,7 +16,9 @@
       "Bash(pnpm prisma migrate dev:*)",
       "Bash(pnpm --filter telao build:*)",
       "Bash(sqlite3:*)",
-      "Bash(pnpm --filter server build:*)"
+      "Bash(pnpm --filter server build:*)",
+      "Bash(pnpm --filter server prisma migrate:*)",
+      "Bash(pnpm exec prisma migrate:*)"
     ],
     "deny": [],
     "ask": []
