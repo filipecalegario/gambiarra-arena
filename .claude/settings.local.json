@@ -22,7 +22,8 @@
       "Bash(pnpm --filter @gambiarra/server db:migrate:*)",
       "mcp__ide__getDiagnostics",
       "Bash(jq:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Skill(frontend-design:frontend-design)"
     ],
     "deny": [],
     "ask": []

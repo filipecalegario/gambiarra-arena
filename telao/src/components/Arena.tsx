@@ -240,33 +240,82 @@ function Arena() {
   }, []);
 
   return (
-    <div className="min-h-screen p-8">
-      <header className="mb-8">
-        <h1 className="text-6xl font-bold text-primary mb-4">
-          🎮 Gambiarra LLM Club Arena
-        </h1>
-        {currentRound && (
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h2 className="text-3xl font-semibold mb-2">
-              Rodada {currentRound.index}
-            </h2>
-            <p className="text-xl text-gray-300">{currentRound.prompt}</p>
-            <div className="mt-4 flex gap-4 text-sm text-gray-400">
-              <span>Max tokens: {currentRound.maxTokens}</span>
-              <span>Prazo: {(currentRound.deadlineMs / 1000).toFixed(0)}s</span>
-              {currentRound.startedAt && !currentRound.endedAt && (
-                <span className="text-green-400 font-semibold">● AO VIVO</span>
-              )}
-              {currentRound.endedAt && (
-                <span className="text-red-400">● ENCERRADA</span>
-              )}
+    <div className="min-h-screen p-6 lg:p-8">
+      {/* Header */}
+      <header className="mb-8 animate-fade-in">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-4xl lg:text-5xl font-mono font-bold text-neon-orange tracking-wider glitch">
+            GAMBIARRA ARENA
+          </h1>
+          <div className="hidden lg:flex items-center gap-4">
+            <div className="px-4 py-2 bg-[var(--color-surface)] border border-[var(--color-surface-light)] rounded font-mono text-sm">
+              <span className="text-[var(--color-neon-yellow)]">{participants.length}</span>
+              <span className="text-gray-400 ml-2">conectados</span>
             </div>
+          </div>
+        </div>
+
+        {/* Round info card */}
+        {currentRound && (
+          <div className="arcade-card rounded-xl p-6 animate-fade-in-up">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="px-3 py-1 bg-[var(--color-neon-purple)]/20 border border-[var(--color-neon-purple)] rounded font-mono font-bold text-[var(--color-neon-purple)] text-sm uppercase tracking-wider">
+                    Rodada {currentRound.index}
+                  </span>
+                  {currentRound.startedAt && !currentRound.endedAt && (
+                    <div className="live-indicator">
+                      <span>AO VIVO</span>
+                    </div>
+                  )}
+                  {currentRound.endedAt && (
+                    <span className="px-3 py-1 bg-red-500/20 border border-red-500 rounded font-mono font-semibold text-red-400 text-xs uppercase tracking-wider">
+                      Encerrada
+                    </span>
+                  )}
+                </div>
+                <p className="text-xl lg:text-2xl font-body text-gray-100 leading-relaxed">
+                  {currentRound.prompt}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-4 lg:gap-6 text-sm font-mono">
+                <div className="flex flex-col items-center p-3 bg-[var(--color-midnight)] rounded-lg border border-[var(--color-surface-light)]">
+                  <span className="text-2xl font-mono font-bold text-neon-cyan">{currentRound.maxTokens}</span>
+                  <span className="text-xs text-gray-500 uppercase">tokens</span>
+                </div>
+                <div className="flex flex-col items-center p-3 bg-[var(--color-midnight)] rounded-lg border border-[var(--color-surface-light)]">
+                  <span className="text-2xl font-mono font-bold text-neon-yellow">{(currentRound.deadlineMs / 1000).toFixed(0)}s</span>
+                  <span className="text-xs text-gray-500 uppercase">prazo</span>
+                </div>
+                {currentRound.svgMode && (
+                  <div className="flex flex-col items-center p-3 bg-[var(--color-neon-pink)]/10 rounded-lg border border-[var(--color-neon-pink)]">
+                    <span className="text-2xl">🎨</span>
+                    <span className="text-xs text-[var(--color-neon-pink)] uppercase font-semibold">SVG</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No round message */}
+        {!currentRound && (
+          <div className="arcade-card rounded-xl p-8 text-center animate-fade-in-up">
+            <div className="text-6xl mb-4 animate-float">⏳</div>
+            <h2 className="text-2xl font-mono font-bold text-gray-300 mb-2">
+              Aguardando rodada
+            </h2>
+            <p className="text-gray-500 font-body">
+              O administrador iniciará a competição em breve...
+            </p>
           </div>
         )}
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {participants.map((participant) => {
+      {/* Participants grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-10">
+        {participants.map((participant, index) => {
           const state = participantStates[participant.id] || {
             tokens: 0,
             isGenerating: false,
@@ -274,25 +323,51 @@ function Arena() {
           };
 
           return (
-            <ParticipantCard
+            <div
               key={participant.id}
-              participant={participant}
-              tokens={state.tokens}
-              maxTokens={currentRound?.maxTokens || 400}
-              isGenerating={state.isGenerating}
-              content={state.content.join('')}
-              svgMode={currentRound?.svgMode || false}
-            />
+              className={`animate-fade-in-up stagger-${Math.min(index + 1, 6)}`}
+              style={{ opacity: 0 }}
+            >
+              <ParticipantCard
+                participant={participant}
+                tokens={state.tokens}
+                maxTokens={currentRound?.maxTokens || 400}
+                isGenerating={state.isGenerating}
+                content={state.content.join('')}
+                svgMode={currentRound?.svgMode || false}
+              />
+            </div>
           );
         })}
       </div>
 
-      <footer className="mt-12 flex justify-center">
-        <div className="bg-gray-800 p-6 rounded-lg text-center">
-          <h3 className="text-2xl font-semibold mb-4">Vote nas respostas!</h3>
-          <QRCodeGenerator value={votingUrl} size={200} />
-          <p className="mt-4 text-gray-400">
-            Escaneie o QR code ou acesse: {votingUrl}
+      {/* Empty state */}
+      {participants.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+          <div className="text-8xl mb-6 animate-float">👾</div>
+          <h2 className="text-3xl font-mono font-bold text-gray-400 mb-3">
+            Nenhum participante conectado
+          </h2>
+          <p className="text-gray-500 font-body text-lg">
+            Aguardando jogadores entrarem na arena...
+          </p>
+        </div>
+      )}
+
+      {/* Footer with QR code */}
+      <footer className="mt-8 flex justify-center animate-fade-in">
+        <div className="arcade-card rounded-xl p-6 lg:p-8 text-center max-w-md">
+          <h3 className="text-xl lg:text-2xl font-mono font-bold text-neon-yellow mb-4 tracking-wider">
+            VOTE NAS RESPOSTAS!
+          </h3>
+          <div className="p-4 bg-white rounded-lg inline-block mb-4">
+            <QRCodeGenerator value={votingUrl} size={180} />
+          </div>
+          <p className="text-sm font-mono text-gray-400">
+            Escaneie o QR code ou acesse:
+          </p>
+          <p className="text-[var(--color-neon-cyan)] font-mono text-sm mt-1 break-all">
+            {votingUrl}
           </p>
         </div>
       </footer>

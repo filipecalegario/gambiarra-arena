@@ -73,46 +73,69 @@ export default function Scoreboard() {
     }
   };
 
-  const getPositionClass = (position: number) => {
+  const getMedalClass = (position: number) => {
     switch (position) {
       case 0:
-        return 'bg-yellow-500/30 border-yellow-500 shadow-yellow-500/30';
+        return 'medal medal-gold';
       case 1:
-        return 'bg-gray-400/30 border-gray-400 shadow-gray-400/30';
+        return 'medal medal-silver';
       case 2:
-        return 'bg-orange-600/30 border-orange-600 shadow-orange-600/30';
+        return 'medal medal-bronze';
       default:
-        return 'bg-purple-500/10 border-purple-500/30';
+        return '';
     }
   };
 
-  const getBarColor = (position: number) => {
+  const getPositionClass = (position: number) => {
     switch (position) {
       case 0:
-        return 'bg-yellow-500';
+        return 'border-[#FFD700] bg-gradient-to-br from-[#FFD700]/20 to-transparent shadow-[0_0_30px_rgba(255,215,0,0.3)]';
       case 1:
-        return 'bg-gray-400';
+        return 'border-[#C0C0C0] bg-gradient-to-br from-[#C0C0C0]/20 to-transparent shadow-[0_0_20px_rgba(192,192,192,0.3)]';
       case 2:
-        return 'bg-orange-500';
+        return 'border-[#CD7F32] bg-gradient-to-br from-[#CD7F32]/20 to-transparent shadow-[0_0_20px_rgba(205,127,50,0.3)]';
       default:
-        return 'bg-primary';
+        return 'border-[var(--color-surface-light)] bg-[var(--color-surface)]/50';
+    }
+  };
+
+  const getBarGradient = (position: number) => {
+    switch (position) {
+      case 0:
+        return 'bg-gradient-to-r from-[#FFD700] to-[#FFA500]';
+      case 1:
+        return 'bg-gradient-to-r from-[#E8E8E8] to-[#B8B8B8]';
+      case 2:
+        return 'bg-gradient-to-r from-[#CD7F32] to-[#8B4513]';
+      default:
+        return 'bg-gradient-to-r from-[var(--color-neon-orange)] to-[var(--color-neon-pink)]';
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="text-white text-2xl animate-pulse">Carregando placar...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <div className="text-6xl mb-4 animate-spin-slow">⚡</div>
+          <h2 className="text-2xl font-mono font-bold text-neon-orange tracking-wider">
+            Carregando placar...
+          </h2>
+        </div>
       </div>
     );
   }
 
   if (!data || data.scoreboard.length === 0) {
     return (
-      <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">📊</div>
-          <h2 className="text-2xl text-gray-400">Nenhum resultado disponível ainda</h2>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <div className="text-8xl mb-6 animate-float">📊</div>
+          <h2 className="text-3xl font-mono font-bold text-gray-400 mb-2">
+            Nenhum resultado disponível
+          </h2>
+          <p className="text-gray-500 font-body">
+            Aguarde a conclusão da rodada...
+          </p>
         </div>
       </div>
     );
@@ -138,18 +161,31 @@ export default function Scoreboard() {
   // State: Reveal mode but waiting for first reveal
   if (isRevealMode && revealedCount === 0) {
     return (
-      <div className="min-h-screen bg-dark flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="text-8xl mb-6 animate-bounce">🏆</div>
-          <h1 className="text-5xl font-bold text-primary mb-4">
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <div className="text-center animate-fade-in">
+          <div className="text-9xl mb-8 animate-float">🏆</div>
+          <h1 className="text-6xl font-mono font-black text-neon-yellow tracking-wider mb-6 glitch">
             PREMIAÇÃO
           </h1>
           {roundInfo && (
-            <p className="text-2xl text-gray-400 mb-4">Rodada {roundInfo.index}</p>
+            <div className="mb-6">
+              <span className="px-4 py-2 bg-[var(--color-neon-purple)]/20 border border-[var(--color-neon-purple)] rounded-lg font-mono font-bold text-[var(--color-neon-purple)] text-xl uppercase tracking-wider">
+                Rodada {roundInfo.index}
+              </span>
+            </div>
           )}
-          <p className="text-xl text-gray-500 animate-pulse">
+          <p className="text-2xl text-gray-400 font-body animate-pulse">
             Aguardando revelação dos resultados...
           </p>
+          <div className="mt-8 flex justify-center gap-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-4 h-4 rounded-full bg-[var(--color-neon-orange)] animate-pulse"
+                style={{ animationDelay: `${i * 200}ms` }}
+              />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -160,44 +196,54 @@ export default function Scoreboard() {
     const maxScore = 5;
 
     return (
-      <div className="min-h-screen bg-dark text-white p-8 overflow-auto">
+      <div className="min-h-screen text-white p-6 lg:p-8 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-5xl font-bold mb-4 text-primary">
+          <div className="mb-8 text-center animate-fade-in">
+            <h1 className="text-5xl lg:text-6xl font-mono font-black text-neon-yellow tracking-wider mb-4 glitch">
               🏆 RESULTADOS FINAIS
             </h1>
             {roundInfo && (
-              <div className="text-gray-400">
-                <p className="text-xl mb-2">Rodada {roundInfo.index}</p>
-                <p className="text-lg italic">"{roundInfo.prompt}"</p>
+              <div className="space-y-2">
+                <span className="inline-block px-4 py-2 bg-[var(--color-neon-purple)]/20 border border-[var(--color-neon-purple)] rounded-lg font-mono font-bold text-[var(--color-neon-purple)] uppercase tracking-wider">
+                  Rodada {roundInfo.index}
+                </span>
+                <p className="text-lg text-gray-400 font-body italic max-w-2xl mx-auto">
+                  "{roundInfo.prompt}"
+                </p>
               </div>
             )}
           </div>
 
           {/* Horizontal Bar Chart */}
-          <div className="bg-gray-800/50 rounded-xl p-6 mb-8 border border-gray-700">
-            <h2 className="text-2xl font-bold mb-6 text-center">Média de Votos (0-5)</h2>
+          <div className="arcade-card rounded-xl p-6 mb-8 animate-fade-in-up">
+            <h2 className="text-2xl font-mono font-bold text-neon-cyan text-center mb-6 tracking-wider">
+              MÉDIA DE VOTOS (0-5)
+            </h2>
             <div className="space-y-4">
               {scoreboard.map((participant, index) => (
-                <div key={participant.participant_id} className="flex items-center gap-4">
-                  <div className="w-8 text-2xl text-center">
-                    {getMedalEmoji(index) || `${index + 1}º`}
+                <div
+                  key={participant.participant_id}
+                  className={`flex items-center gap-4 animate-slide-in-left stagger-${Math.min(index + 1, 6)}`}
+                  style={{ opacity: 0 }}
+                >
+                  <div className="w-10 text-2xl text-center">
+                    {index < 3 ? getMedalEmoji(index) : <span className="text-gray-500 font-mono font-bold">{index + 1}º</span>}
                   </div>
-                  <div className="w-32 font-bold truncate text-right">
+                  <div className="w-28 lg:w-36 font-mono font-bold truncate text-right text-gray-200">
                     {participant.nickname}
                   </div>
-                  <div className="flex-1 h-8 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="flex-1 h-10 bg-[var(--color-midnight)] rounded border-2 border-[var(--color-surface-light)] overflow-hidden">
                     <div
-                      className={`h-full ${getBarColor(index)} transition-all duration-1000 ease-out flex items-center justify-end pr-3`}
-                      style={{ width: `${(participant.avg_score / maxScore) * 100}%` }}
+                      className={`h-full ${getBarGradient(index)} transition-all duration-1000 ease-out flex items-center justify-end pr-3`}
+                      style={{ width: `${Math.max((participant.avg_score / maxScore) * 100, 10)}%` }}
                     >
-                      <span className="text-white font-bold text-sm drop-shadow">
+                      <span className="text-[var(--color-deep-blue)] font-mono font-bold text-sm drop-shadow">
                         {participant.avg_score.toFixed(2)}
                       </span>
                     </div>
                   </div>
-                  <div className="w-20 text-right text-gray-400 text-sm">
+                  <div className="w-24 text-right text-gray-500 text-sm font-mono">
                     {participant.votes} voto{participant.votes !== 1 ? 's' : ''}
                   </div>
                 </div>
@@ -210,31 +256,36 @@ export default function Scoreboard() {
             {scoreboard.slice(0, 3).map((participant, index) => (
               <div
                 key={participant.participant_id}
-                className={`border-2 rounded-xl p-6 transition-all shadow-lg ${getPositionClass(index)} ${
+                className={`arcade-card border-2 rounded-xl p-6 transition-all animate-bounce-in ${getPositionClass(index)} ${
                   index === 0 ? 'md:order-2 md:scale-105' : index === 1 ? 'md:order-1' : 'md:order-3'
                 }`}
+                style={{ animationDelay: `${(2 - index) * 200}ms`, opacity: 0 }}
               >
                 <div className="text-center">
-                  <div className="text-6xl mb-2">{getMedalEmoji(index)}</div>
-                  <div className="text-3xl font-bold mb-1">{participant.nickname}</div>
-                  <div className="text-4xl font-bold text-primary mb-2">
+                  <div className={`${getMedalClass(index)} mx-auto mb-3`}>
+                    {getMedalEmoji(index)}
+                  </div>
+                  <div className="text-2xl lg:text-3xl font-mono font-bold mb-2 text-gray-100">
+                    {participant.nickname}
+                  </div>
+                  <div className="text-4xl lg:text-5xl font-mono font-black text-neon-cyan mb-2">
                     {participant.avg_score.toFixed(2)}
                   </div>
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-gray-500 text-sm font-mono">
                     {participant.votes} voto{participant.votes !== 1 ? 's' : ''}
                   </div>
                 </div>
 
                 {/* Response Preview */}
                 {participant.generated_content && (
-                  <div className="mt-4 border-t border-gray-600 pt-4">
+                  <div className="mt-4 pt-4 border-t border-[var(--color-surface-light)]">
                     {svgMode ? (
                       <div
                         className="w-full bg-white rounded-lg p-2 max-h-48 overflow-hidden"
                         dangerouslySetInnerHTML={{ __html: participant.generated_content }}
                       />
                     ) : (
-                      <div className="text-sm text-gray-300 font-mono whitespace-pre-wrap max-h-32 overflow-hidden">
+                      <div className="text-sm text-gray-400 font-mono whitespace-pre-wrap max-h-32 overflow-hidden bg-[var(--color-midnight)] p-3 rounded">
                         {participant.generated_content.slice(0, 300)}
                         {participant.generated_content.length > 300 && '...'}
                       </div>
@@ -246,43 +297,48 @@ export default function Scoreboard() {
           </div>
 
           {/* Full Results List */}
-          <div className="space-y-4">
-            {scoreboard.slice(3).map((participant, idx) => {
-              const position = idx + 3;
-              return (
-                <div
-                  key={participant.participant_id}
-                  className={`border-2 rounded-lg p-4 ${getPositionClass(position)}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="text-2xl font-bold w-12 text-center">
-                      {position + 1}º
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold">{participant.nickname}</h3>
-                      {participant.generated_content && !svgMode && (
-                        <p className="text-sm text-gray-400 font-mono truncate">
-                          {participant.generated_content.slice(0, 100)}...
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
-                        {participant.avg_score.toFixed(2)}
+          {scoreboard.length > 3 && (
+            <div className="space-y-3">
+              {scoreboard.slice(3).map((participant, idx) => {
+                const position = idx + 3;
+                return (
+                  <div
+                    key={participant.participant_id}
+                    className={`arcade-card border-2 rounded-lg p-4 animate-fade-in ${getPositionClass(position)}`}
+                    style={{ animationDelay: `${(idx + 4) * 100}ms`, opacity: 0 }}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="text-2xl font-mono font-bold w-14 text-center text-gray-500">
+                        {position + 1}º
                       </div>
-                      <div className="text-sm text-gray-400">
-                        {participant.votes} voto{participant.votes !== 1 ? 's' : ''}
+                      <div className="flex-1">
+                        <h3 className="text-xl font-mono font-bold text-gray-200">{participant.nickname}</h3>
+                        {participant.generated_content && !svgMode && (
+                          <p className="text-sm text-gray-500 font-mono truncate">
+                            {participant.generated_content.slice(0, 100)}...
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-mono font-bold text-neon-cyan">
+                          {participant.avg_score.toFixed(2)}
+                        </div>
+                        <div className="text-sm text-gray-500 font-mono">
+                          {participant.votes} voto{participant.votes !== 1 ? 's' : ''}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Footer */}
-          <div className="mt-12 text-center text-gray-500 text-sm">
-            <p>🎮 Gambiarra LLM Club Arena Local</p>
+          <div className="mt-12 text-center">
+            <p className="font-mono text-gray-600 tracking-wider">
+              GAMBIARRA LLM CLUB ARENA
+            </p>
           </div>
         </div>
       </div>
@@ -292,24 +348,29 @@ export default function Scoreboard() {
   // State: Reveal mode - showing revealed positions (last to first)
   if (isRevealMode && revealedCount > 0) {
     return (
-      <div className="min-h-screen bg-dark text-white p-8 overflow-auto">
+      <div className="min-h-screen text-white p-6 lg:p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-5xl font-bold mb-4 text-primary">
+          <div className="mb-8 text-center animate-fade-in">
+            <h1 className="text-5xl lg:text-6xl font-mono font-black text-neon-yellow tracking-wider mb-4">
               🏆 PREMIAÇÃO
             </h1>
             {roundInfo && (
-              <p className="text-xl text-gray-400 mb-2">Rodada {roundInfo.index}</p>
+              <span className="inline-block px-4 py-2 bg-[var(--color-neon-purple)]/20 border border-[var(--color-neon-purple)] rounded-lg font-mono font-bold text-[var(--color-neon-purple)] uppercase tracking-wider mb-4">
+                Rodada {roundInfo.index}
+              </span>
             )}
-            <div className="text-lg text-gray-500">
-              Revelados: {revealedCount} de {totalParticipants}
+            <div className="flex items-center justify-center gap-4 text-lg">
+              <span className="text-gray-500 font-mono">Revelados:</span>
+              <span className="text-neon-cyan font-mono font-bold text-2xl">{revealedCount}</span>
+              <span className="text-gray-600">/</span>
+              <span className="text-gray-400 font-mono">{totalParticipants}</span>
             </div>
           </div>
 
           {/* Revealed Participants (from last to most recent) */}
           <div className="space-y-6">
-            {revealedParticipants.map((participant) => {
+            {revealedParticipants.map((participant, revealIndex) => {
               // Find actual position (1-indexed)
               const position = scoreboard.findIndex(p => p.participant_id === participant.participant_id);
               const displayPosition = position + 1;
@@ -318,45 +379,58 @@ export default function Scoreboard() {
               return (
                 <div
                   key={participant.participant_id}
-                  className={`border-2 rounded-xl p-6 transition-all animate-fade-in ${
-                    isPodium ? getPositionClass(position) + ' shadow-lg' : 'bg-gray-800/50 border-gray-700'
+                  className={`arcade-card border-2 rounded-xl p-6 transition-all animate-fade-in-up ${
+                    isPodium ? getPositionClass(position) : ''
                   }`}
+                  style={{ animationDelay: `${revealIndex * 150}ms`, opacity: 0 }}
                 >
-                  <div className="flex items-start gap-6">
-                    {/* Position */}
-                    <div className="text-center">
-                      <div className="text-5xl mb-1">
-                        {getMedalEmoji(position) || ''}
-                      </div>
-                      <div className={`text-4xl font-bold ${isPodium ? 'text-white' : 'text-gray-400'}`}>
-                        {displayPosition}º
-                      </div>
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+                    {/* Position Badge */}
+                    <div className="flex lg:flex-col items-center gap-4 lg:gap-2">
+                      {isPodium ? (
+                        <div className={`${getMedalClass(position)}`}>
+                          {getMedalEmoji(position)}
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-[var(--color-surface)] border-2 border-[var(--color-surface-light)] flex items-center justify-center">
+                          <span className="text-2xl font-mono font-bold text-gray-400">
+                            {displayPosition}º
+                          </span>
+                        </div>
+                      )}
+                      {isPodium && (
+                        <span className="text-3xl font-mono font-bold text-gray-300">{displayPosition}º</span>
+                      )}
                     </div>
 
                     {/* Info */}
                     <div className="flex-1">
-                      <h2 className={`text-3xl font-bold mb-2 ${isPodium ? 'text-white' : 'text-gray-200'}`}>
+                      <h2 className={`text-3xl lg:text-4xl font-mono font-bold mb-3 ${
+                        isPodium ? 'text-white' : 'text-gray-200'
+                      }`}>
                         {participant.nickname}
                       </h2>
 
-                      <div className="flex items-center gap-6 mb-4">
-                        <div>
-                          <span className="text-4xl font-bold text-primary">
+                      <div className="flex flex-wrap items-center gap-4 lg:gap-6 mb-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl lg:text-5xl font-mono font-black text-neon-cyan">
                             {participant.avg_score.toFixed(2)}
                           </span>
-                          <span className="text-gray-400 ml-2">média</span>
+                          <span className="text-gray-500 font-body">média</span>
                         </div>
-                        <div className="text-gray-400">
-                          {participant.votes} voto{participant.votes !== 1 ? 's' : ''}
+                        <div className="px-3 py-1 bg-[var(--color-surface)] rounded-lg">
+                          <span className="text-gray-400 font-mono">
+                            {participant.votes} voto{participant.votes !== 1 ? 's' : ''}
+                          </span>
                         </div>
-                        <div className="text-gray-500 text-sm">
+                        <div className="text-gray-600 text-sm font-mono hidden lg:block">
                           {participant.tokens} tokens | {participant.tps_avg.toFixed(1)} TPS
                         </div>
                       </div>
 
                       {/* Response Content */}
                       {participant.generated_content && (
-                        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700">
+                        <div className="bg-[var(--color-midnight)] rounded-lg p-4 border border-[var(--color-surface-light)]">
                           {svgMode ? (
                             <div
                               className="w-full bg-white rounded-lg p-4 max-h-64 overflow-auto"
@@ -378,9 +452,12 @@ export default function Scoreboard() {
 
           {/* Next reveal hint */}
           {revealedCount < totalParticipants && (
-            <div className="mt-8 text-center">
-              <div className="text-2xl text-gray-500 animate-pulse">
-                Próximo: {totalParticipants - revealedCount}º lugar...
+            <div className="mt-10 text-center">
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-[var(--color-surface)] border border-[var(--color-surface-light)] rounded-lg">
+                <span className="text-2xl animate-pulse">👀</span>
+                <span className="text-xl text-gray-400 font-mono">
+                  Próximo: <span className="text-neon-yellow font-bold">{totalParticipants - revealedCount}º lugar</span>
+                </span>
               </div>
             </div>
           )}
@@ -395,71 +472,92 @@ export default function Scoreboard() {
   const totalVotes = scoreboard.reduce((sum, p) => sum + p.votes, 0);
 
   return (
-    <div className="min-h-screen bg-dark text-white p-8">
+    <div className="min-h-screen text-white p-6 lg:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-5xl font-bold mb-4 text-primary">
-            {votingStatus === 'open' ? '🗳️ Votação em Andamento' : '⏳ Aguardando Premiação'}
+        <div className="mb-8 text-center animate-fade-in">
+          <h1 className="text-4xl lg:text-5xl font-mono font-bold tracking-wider mb-4">
+            {votingStatus === 'open' ? (
+              <span className="text-neon-cyan">🗳️ VOTAÇÃO EM ANDAMENTO</span>
+            ) : (
+              <span className="text-neon-yellow">⏳ AGUARDANDO PREMIAÇÃO</span>
+            )}
           </h1>
           {roundInfo && (
-            <div className="text-gray-400">
-              <p className="text-xl mb-2">Rodada {roundInfo.index}</p>
-              <p className="text-lg italic">"{roundInfo.prompt}"</p>
+            <div className="space-y-2">
+              <span className="inline-block px-4 py-2 bg-[var(--color-neon-purple)]/20 border border-[var(--color-neon-purple)] rounded-lg font-mono font-bold text-[var(--color-neon-purple)] uppercase tracking-wider">
+                Rodada {roundInfo.index}
+              </span>
+              <p className="text-lg text-gray-400 font-body italic max-w-2xl mx-auto">
+                "{roundInfo.prompt}"
+              </p>
             </div>
           )}
 
           {/* Total votes counter */}
-          <div className="mt-6 inline-flex items-center gap-4 bg-gray-800/50 px-8 py-4 rounded-full border border-gray-700">
-            <span className="text-5xl">🗳️</span>
-            <div>
-              <div className="text-5xl font-bold text-primary">{totalVotes}</div>
-              <div className="text-gray-400">voto{totalVotes !== 1 ? 's' : ''} recebido{totalVotes !== 1 ? 's' : ''}</div>
+          <div className="mt-8 inline-flex items-center gap-4 arcade-card px-8 py-5 rounded-xl">
+            <span className="text-5xl animate-float">🗳️</span>
+            <div className="text-left">
+              <div className="text-5xl lg:text-6xl font-mono font-black text-neon-orange animate-counter-up">
+                {totalVotes}
+              </div>
+              <div className="text-gray-400 font-body">
+                voto{totalVotes !== 1 ? 's' : ''} recebido{totalVotes !== 1 ? 's' : ''}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Participants with vote counts only (no scores revealed) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedByName.map((participant) => (
+          {sortedByName.map((participant, index) => (
             <div
               key={participant.participant_id}
-              className="bg-gray-800/50 border-2 border-gray-700 rounded-xl p-6 transition-all hover:border-primary/50"
+              className={`arcade-card rounded-xl p-6 transition-all hover:scale-[1.02] animate-fade-in-up stagger-${Math.min(index + 1, 6)}`}
+              style={{ opacity: 0 }}
             >
               <div className="text-center">
+                {/* Avatar */}
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--color-neon-orange)] to-[var(--color-neon-pink)] flex items-center justify-center text-2xl font-display font-bold text-[var(--color-deep-blue)] mx-auto mb-3">
+                  {participant.nickname.charAt(0).toUpperCase()}
+                </div>
+
                 {/* Nickname */}
-                <h3 className="text-2xl font-bold mb-4">{participant.nickname}</h3>
+                <h3 className="text-xl font-mono font-bold text-gray-100 mb-4 tracking-wide">
+                  {participant.nickname}
+                </h3>
 
                 {/* Vote count with animation */}
                 <div className="flex items-center justify-center gap-3">
-                  <div className={`text-6xl font-bold transition-all ${
-                    participant.votes > 0 ? 'text-primary' : 'text-gray-600'
+                  <div className={`text-5xl font-mono font-black transition-all ${
+                    participant.votes > 0 ? 'text-neon-cyan' : 'text-gray-700'
                   }`}>
                     {participant.votes}
                   </div>
                   <div className="text-left">
-                    <div className="text-gray-400">voto{participant.votes !== 1 ? 's' : ''}</div>
-                    {participant.votes > 0 && (
-                      <div className="text-xs text-gray-500">recebido{participant.votes !== 1 ? 's' : ''}</div>
-                    )}
+                    <div className="text-gray-500 font-body text-sm">
+                      voto{participant.votes !== 1 ? 's' : ''}
+                    </div>
                   </div>
                 </div>
 
                 {/* Vote indicator dots */}
-                {participant.votes > 0 && participant.votes <= 20 && (
-                  <div className="mt-4 flex justify-center flex-wrap gap-1">
+                {participant.votes > 0 && participant.votes <= 15 && (
+                  <div className="mt-4 flex justify-center flex-wrap gap-1.5">
                     {Array.from({ length: participant.votes }).map((_, i) => (
                       <div
                         key={i}
-                        className="w-3 h-3 rounded-full bg-primary animate-pulse"
+                        className="w-2.5 h-2.5 rounded-full bg-[var(--color-neon-orange)] animate-pulse"
                         style={{ animationDelay: `${i * 100}ms` }}
                       />
                     ))}
                   </div>
                 )}
-                {participant.votes > 20 && (
-                  <div className="mt-4 text-primary text-sm">
-                    🔥 Muitos votos!
+                {participant.votes > 15 && (
+                  <div className="mt-4">
+                    <span className="px-3 py-1 bg-[var(--color-neon-orange)]/20 border border-[var(--color-neon-orange)] rounded text-[var(--color-neon-orange)] text-sm font-display font-semibold">
+                      🔥 Muitos votos!
+                    </span>
                   </div>
                 )}
               </div>
@@ -470,20 +568,30 @@ export default function Scoreboard() {
         {/* Suspense message */}
         <div className="mt-12 text-center">
           {votingStatus === 'open' ? (
-            <div className="text-xl text-gray-400 animate-pulse">
-              Os resultados serão revelados quando a votação encerrar...
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-[var(--color-surface)] border border-[var(--color-surface-light)] rounded-lg animate-pulse">
+              <span className="text-xl">🤫</span>
+              <span className="text-lg text-gray-400 font-body">
+                Os resultados serão revelados quando a votação encerrar...
+              </span>
             </div>
           ) : (
-            <div className="text-xl text-yellow-500 animate-pulse">
-              Aguardando o admin iniciar a premiação...
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-[var(--color-neon-yellow)]/10 border border-[var(--color-neon-yellow)] rounded-lg animate-pulse">
+              <span className="text-xl">⏳</span>
+              <span className="text-lg text-[var(--color-neon-yellow)] font-mono font-semibold">
+                Aguardando o admin iniciar a premiação...
+              </span>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>🎮 Gambiarra LLM Club Arena Local</p>
-          <p className="mt-2">Atualização automática a cada 2 segundos</p>
+        <div className="mt-10 text-center">
+          <p className="font-mono text-gray-600 tracking-wider text-sm">
+            GAMBIARRA LLM CLUB ARENA
+          </p>
+          <p className="mt-2 text-gray-700 text-xs font-mono">
+            Atualização automática a cada 2s
+          </p>
         </div>
       </div>
     </div>
