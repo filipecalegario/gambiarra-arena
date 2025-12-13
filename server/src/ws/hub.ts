@@ -86,7 +86,7 @@ export class WebSocketHub {
     // Register this websocket as a telao connection
     this.telaoConnections.set(connId, ws);
 
-    this.logger.info({ connId, view: message.view }, 'Telao registered');
+    this.logger.debug({ connId, view: message.view }, 'Telao registered');
 
     try {
       ws.send(JSON.stringify({ type: 'registered_telao', view: message.view || 'arena' }));
@@ -151,7 +151,7 @@ export class WebSocketHub {
         lastSeen: new Date(),
       });
 
-      this.logger.info(
+      this.logger.debug(
         { participantId: message.participant_id, sessionId: session.id },
         'Participant registered'
       );
@@ -346,7 +346,7 @@ export class WebSocketHub {
         },
       });
 
-      this.logger.info(
+      this.logger.debug(
         { participantId: message.participant_id, round: message.round, tokens: message.tokens },
         'Completion recorded'
       );
@@ -386,7 +386,7 @@ export class WebSocketHub {
   private async handleDisconnection(connId: string) {
     const conn = this.connections.get(connId);
     if (conn) {
-      this.logger.info({ participantId: conn.participantId }, 'Participant disconnected');
+      this.logger.debug({ participantId: conn.participantId }, 'Participant disconnected');
 
       // Update lastSeen and connected=false in the database so frontends can detect offline participants
       try {
@@ -420,7 +420,7 @@ export class WebSocketHub {
 
     // Also remove from telao connections if present
     if (this.telaoConnections.has(connId)) {
-      this.logger.info({ connId }, 'Telao disconnected');
+      this.logger.debug({ connId }, 'Telao disconnected');
       this.telaoConnections.delete(connId);
     }
   }
@@ -441,7 +441,6 @@ export class WebSocketHub {
     const telaoCount = this.telaoConnections.size;
 
     if (telaoCount === 0) {
-      this.logger.warn({ messageType: message.type }, 'No telao connections to broadcast to');
       return;
     }
 
@@ -451,17 +450,6 @@ export class WebSocketHub {
       } catch (error) {
         this.logger.error({ error, telaoConn: id }, 'Failed to send message to telao');
       }
-    }
-
-    // Log token_update broadcasts at info level for debugging
-    if (message.type === 'token_update') {
-      this.logger.info({
-        participantId: message.participant_id,
-        seq: message.seq,
-        telaoCount
-      }, 'Broadcast token_update to telao');
-    } else {
-      this.logger.debug({ messageType: message.type, telaoCount }, 'Broadcasted to telao connections');
     }
   }
 

@@ -16,7 +16,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const app = Fastify({
   logger: {
-    level: NODE_ENV === 'development' ? 'debug' : 'info',
+    level: 'warn', // Only warnings and errors
     transport:
       NODE_ENV === 'development'
         ? {
@@ -30,14 +30,14 @@ const app = Fastify({
         : undefined,
   },
   requestIdLogLabel: 'reqId',
-  disableRequestLogging: false,
+  disableRequestLogging: true, // Disable HTTP request logging
   requestIdHeader: 'x-request-id',
   trustProxy: true, // Trust X-Forwarded-For headers
 });
 
 // Database
 const prisma = new PrismaClient({
-  log: NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  log: ['error'], // Only log errors
 });
 
 // Make Prisma available in routes
@@ -102,14 +102,14 @@ process.on('SIGTERM', shutdown);
 try {
   await app.listen({ port: PORT, host: HOST });
 
-  app.log.info(`
+  console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║  🎮 Gambiarra LLM Club Arena Local                   ║
-║  Server running on http://${HOST}:${PORT}      ║
-║  WebSocket: ws://${HOST}:${PORT}/ws              ║
+║  Server running on http://${HOST}:${PORT}              ║
+║  WebSocket: ws://${HOST}:${PORT}/ws                    ║
 ╚═══════════════════════════════════════════════════════╝
   `);
 } catch (err) {
-  app.log.error(err);
+  console.error('Failed to start server:', err);
   process.exit(1);
 }
