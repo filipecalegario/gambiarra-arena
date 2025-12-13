@@ -47,6 +47,17 @@ function SvgRenderer({ content, isGenerating }: SvgRendererProps) {
             <span className="text-sm">Nenhum SVG detectado</span>
           )}
         </div>
+        {/* Show raw response when no SVG found */}
+        {content && (
+          <details className="mt-2">
+            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
+              Ver resposta recebida
+            </summary>
+            <pre className="text-xs text-gray-400 mt-2 p-2 bg-gray-800 rounded overflow-x-auto whitespace-pre-wrap">
+              {content}
+            </pre>
+          </details>
+        )}
       </div>
     );
   }
@@ -72,15 +83,25 @@ function SvgRenderer({ content, isGenerating }: SvgRendererProps) {
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
 
-      {/* Debug info - can be removed in production */}
-      <details className="mt-2">
-        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
-          Ver código SVG
-        </summary>
-        <pre className="text-xs text-gray-400 mt-2 p-2 bg-gray-800 rounded overflow-x-auto">
-          {svgContent}
-        </pre>
-      </details>
+      {/* Debug toggles */}
+      <div className="mt-2 flex gap-4">
+        <details>
+          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
+            Ver código SVG
+          </summary>
+          <pre className="text-xs text-gray-400 mt-2 p-2 bg-gray-800 rounded overflow-x-auto">
+            {svgContent}
+          </pre>
+        </details>
+        <details>
+          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
+            Ver resposta recebida
+          </summary>
+          <pre className="text-xs text-gray-400 mt-2 p-2 bg-gray-800 rounded overflow-x-auto whitespace-pre-wrap">
+            {content}
+          </pre>
+        </details>
+      </div>
     </div>
   );
 }

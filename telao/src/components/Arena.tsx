@@ -38,12 +38,19 @@ interface Completion {
   round: number;
   tokens: number;
   duration_ms: number;
+  ttft_ms?: number | null;
+  tps?: number | null;
 }
 
 interface ParticipantState {
   tokens: number;
   isGenerating: boolean;
   content: string[];
+  tokensBySeq: Record<number, string>; // seq -> token for deduplication
+  currentRound?: number; // Track which round the tokens belong to
+  ttftMs?: number;
+  tps?: number;
+  durationMs?: number;
 }
 
 function Arena() {
@@ -96,30 +103,56 @@ function Arena() {
         })
         .then((data) => {
           if (!data) return;
+
+          // Update current round
           setCurrentRound(data);
-          // Initialize participant states from live tokens
-          if (data.liveTokens) {
+
+          // Only sync from polling if round is NOT actively generating
+          // During active generation, WebSocket handles updates exclusively
+          const isActivelyGenerating = data.startedAt && !data.endedAt;
+          if (data.liveTokens && !isActivelyGenerating) {
             setParticipantStates((prevStates) => {
               const newStates: Record<string, ParticipantState> = { ...prevStates };
               for (const [pid, tokens] of Object.entries(data.liveTokens)) {
                 // Only update if we don't have this participant yet, or merge carefully
                 const existingState = newStates[pid];
                 if (!existingState) {
-                  // New participant - initialize
+                  // New participant - initialize from polling data
+                  const tokenArr = tokens as string[];
+                  const tokensBySeq: Record<number, string> = {};
+                  tokenArr.forEach((t, i) => { tokensBySeq[i] = t; });
                   newStates[pid] = {
-                    tokens: (tokens as string[]).length,
+                    tokens: tokenArr.length,
                     isGenerating: !data.endedAt,
-                    content: tokens as string[],
+                    content: tokenArr,
+                    tokensBySeq,
                   };
                 } else {
-                  // Existing participant - preserve isGenerating if already false
-                  // Also preserve content if new content is empty but we have existing content
+                  // Existing participant - preserve WebSocket state if it has more data
+                  // Polling should NOT overwrite WebSocket streaming data
                   const newTokens = tokens as string[];
-                  newStates[pid] = {
-                    tokens: newTokens.length || existingState.tokens,
-                    isGenerating: existingState.isGenerating === false ? false : !data.endedAt,
-                    content: newTokens.length > 0 ? newTokens : existingState.content,
-                  };
+                  const existingContent = existingState.content || [];
+
+                  // Only use polling data if it has MORE tokens than what we have
+                  if (newTokens.length > existingContent.length) {
+                    const tokensBySeq: Record<number, string> = {};
+                    newTokens.forEach((t, i) => { tokensBySeq[i] = t; });
+                    newStates[pid] = {
+                      tokens: newTokens.length,
+                      isGenerating: existingState.isGenerating === false ? false : !data.endedAt,
+                      content: newTokens,
+                      tokensBySeq,
+                      ttftMs: existingState.ttftMs,
+                      tps: existingState.tps,
+                      durationMs: existingState.durationMs,
+                    };
+                  } else {
+                    // Keep existing state, just update isGenerating if round ended
+                    newStates[pid] = {
+                      ...existingState,
+                      isGenerating: existingState.isGenerating === false ? false : !data.endedAt,
+                    };
+                  }
                 }
               }
               return newStates;
@@ -130,6 +163,7 @@ function Arena() {
             setParticipantStates((prevStates) => {
               const newStates: Record<string, ParticipantState> = {};
               for (const [pid, state] of Object.entries(prevStates)) {
+                // Preserve all state including metrics
                 newStates[pid] = { ...state, isGenerating: false };
               }
               return newStates;
@@ -174,30 +208,64 @@ function Arena() {
     ws.addEventListener('message', (ev) => {
       try {
         const msg = JSON.parse(ev.data);
+        console.log('[WS] Received:', msg.type, msg);
 
         switch (msg.type) {
           case 'token_update': {
             const pid = msg.participant_id as string;
+            const seq = msg.seq as number;
+            const round = msg.round as number;
+            const tokenContent = msg.content as string;
             setParticipantStates((prev) => {
-              const next = { ...prev };
-              const state = next[pid] || { tokens: 0, isGenerating: false, content: [] };
-              state.tokens = msg.total_tokens;
-              state.isGenerating = true;
-              state.content = [...(state.content || []), msg.content];
-              next[pid] = state;
-              return next;
+              const existingState = prev[pid] || { tokens: 0, isGenerating: false, content: [], tokensBySeq: {} };
+
+              // Check if round changed - if so, reset tokensBySeq
+              const roundChanged = existingState.currentRound !== undefined && existingState.currentRound !== round;
+              const existingTokensBySeq = roundChanged ? {} : (existingState.tokensBySeq || {});
+
+              // Skip if we already have this seq (duplicate)
+              if (existingTokensBySeq[seq] !== undefined) {
+                return prev;
+              }
+
+              // Add token to map
+              const newTokensBySeq = { ...existingTokensBySeq, [seq]: tokenContent };
+
+              // Rebuild content array from map (sorted by seq)
+              const sortedSeqs = Object.keys(newTokensBySeq).map(Number).sort((a, b) => a - b);
+              const newContent = sortedSeqs.map(s => newTokensBySeq[s]);
+
+              return {
+                ...prev,
+                [pid]: {
+                  ...existingState,
+                  tokens: msg.total_tokens,
+                  isGenerating: true,
+                  content: newContent,
+                  tokensBySeq: newTokensBySeq,
+                  currentRound: round,
+                },
+              };
             });
             break;
           }
           case 'completion': {
             const pid = msg.participant_id as string;
             setParticipantStates((prev) => {
-              const next = { ...prev };
-              const state = next[pid] || { tokens: 0, isGenerating: false, content: [] };
-              state.tokens = msg.tokens;
-              state.isGenerating = false;
-              next[pid] = state;
-              return next;
+              const existingState = prev[pid] || { tokens: 0, isGenerating: false, content: [], tokensBySeq: {} };
+              // Return new state object (immutable update)
+              return {
+                ...prev,
+                [pid]: {
+                  ...existingState,
+                  tokens: msg.tokens,
+                  isGenerating: false,
+                  // Store server-calculated metrics
+                  ttftMs: msg.ttft_ms ?? existingState.ttftMs,
+                  tps: msg.tps ?? existingState.tps,
+                  durationMs: msg.duration_ms ?? existingState.durationMs,
+                },
+              };
             });
             break;
           }
@@ -320,6 +388,7 @@ function Arena() {
             tokens: 0,
             isGenerating: false,
             content: [],
+            tokensBySeq: {},
           };
 
           return (
@@ -335,6 +404,9 @@ function Arena() {
                 isGenerating={state.isGenerating}
                 content={state.content.join('')}
                 svgMode={currentRound?.svgMode || false}
+                ttftMs={state.ttftMs}
+                tps={state.tps}
+                durationMs={state.durationMs}
               />
             </div>
           );

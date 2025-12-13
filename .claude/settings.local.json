@@ -23,7 +23,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(jq:*)",
       "Bash(ls:*)",
-      "Skill(frontend-design:frontend-design)"
+      "Skill(frontend-design:frontend-design)",
+      "Bash(pnpm --filter @gambiarra/server build)"
     ],
     "deny": [],
     "ask": []

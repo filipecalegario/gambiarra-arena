@@ -275,10 +275,6 @@ export class WebSocketHub {
         return;
       }
 
-      const tpsAvg = message.duration_ms > 0
-        ? (message.tokens / message.duration_ms) * 1000
-        : null;
-
       // Get generated content from token buffer
       const participantTokens = this.tokenBuffer.get(message.participant_id);
       const roundTokens = participantTokens?.get(message.round);
@@ -286,6 +282,31 @@ export class WebSocketHub {
 
       // Get first token timestamp for research
       const firstTokenAt = this.firstTokenTime.get(message.participant_id)?.get(message.round);
+
+      // Calculate server-side metrics
+      let serverTtftMs: number | null = null;
+      let serverTps: number | null = null;
+      let serverDurationMs: number | null = null;
+
+      if (round.startedAt && firstTokenAt) {
+        // TTFT: time from challenge broadcast to first token received
+        serverTtftMs = firstTokenAt.getTime() - round.startedAt.getTime();
+        // Total duration: time from challenge to completion
+        serverDurationMs = completionTime.getTime() - round.startedAt.getTime();
+        // Generation duration: time from first token to completion (actual generation time)
+        const generationDurationMs = completionTime.getTime() - firstTokenAt.getTime();
+        // TPS: tokens per second during actual generation
+        if (generationDurationMs > 0) {
+          serverTps = (message.tokens / generationDurationMs) * 1000;
+        }
+      }
+
+      // Use server-calculated metrics with fallback to client-reported values
+      const finalTtftMs = serverTtftMs ?? message.latency_ms_first_token ?? null;
+      const finalDurationMs = serverDurationMs ?? message.duration_ms;
+      const finalTps = serverTps ?? (message.duration_ms > 0
+        ? (message.tokens / message.duration_ms) * 1000
+        : null);
 
       // Calculate generation start time from first token minus latency
       const generationStartedAt = firstTokenAt && message.latency_ms_first_token
@@ -303,9 +324,9 @@ export class WebSocketHub {
           roundId: round.id,
           participantId: message.participant_id,
           tokens: message.tokens,
-          latencyFirstTokenMs: message.latency_ms_first_token,
-          durationMs: message.duration_ms,
-          tpsAvg,
+          latencyFirstTokenMs: finalTtftMs,
+          durationMs: finalDurationMs,
+          tpsAvg: finalTps,
           modelInfo: message.model_info ? JSON.stringify(message.model_info) : null,
           generatedContent,
           generationStartedAt,
@@ -314,9 +335,9 @@ export class WebSocketHub {
         },
         update: {
           tokens: message.tokens,
-          latencyFirstTokenMs: message.latency_ms_first_token,
-          durationMs: message.duration_ms,
-          tpsAvg,
+          latencyFirstTokenMs: finalTtftMs,
+          durationMs: finalDurationMs,
+          tpsAvg: finalTps,
           modelInfo: message.model_info ? JSON.stringify(message.model_info) : null,
           generatedContent,
           generationStartedAt,
@@ -341,19 +362,21 @@ export class WebSocketHub {
         metadata: {
           roundIndex: message.round,
           tokens: message.tokens,
-          durationMs: message.duration_ms,
-          latencyFirstTokenMs: message.latency_ms_first_token,
-          tpsAvg,
+          durationMs: finalDurationMs,
+          latencyFirstTokenMs: finalTtftMs,
+          tpsAvg: finalTps,
         },
       });
 
-      // Broadcast completion
+      // Broadcast completion with server-calculated metrics
       this.broadcastToTelao({
         type: 'completion',
         participant_id: message.participant_id,
         round: message.round,
         tokens: message.tokens,
-        duration_ms: message.duration_ms,
+        duration_ms: finalDurationMs,
+        ttft_ms: finalTtftMs,
+        tps: finalTps,
       });
     } catch (error) {
       this.logger.error({ error }, 'Failed to record completion');

@@ -14,6 +14,9 @@ interface ParticipantCardProps {
   isGenerating: boolean;
   content: string;
   svgMode?: boolean;
+  ttftMs?: number;
+  tps?: number;
+  durationMs?: number;
 }
 
 function ParticipantCard({
@@ -23,6 +26,9 @@ function ParticipantCard({
   isGenerating,
   content,
   svgMode = false,
+  ttftMs,
+  tps,
+  durationMs,
 }: ParticipantCardProps) {
   const progress = (tokens / maxTokens) * 100;
 
@@ -99,6 +105,25 @@ function ParticipantCard({
           <span className="text-sm text-gray-500 font-mono animate-pulse">
             Aguardando resposta...
           </span>
+        </div>
+      )}
+
+      {/* Metrics footer - only after completion */}
+      {!isGenerating && ttftMs !== undefined && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-surface-light)] flex justify-center gap-4 text-xs font-mono">
+          <span className="text-[var(--color-neon-cyan)]">
+            TTFT: {(ttftMs / 1000).toFixed(2)}s
+          </span>
+          {tps !== undefined && (
+            <span className="text-[var(--color-neon-yellow)]">
+              TPS: {tps.toFixed(1)}
+            </span>
+          )}
+          {durationMs !== undefined && (
+            <span className="text-[var(--color-neon-orange)]">
+              Total: {(durationMs / 1000).toFixed(1)}s
+            </span>
+          )}
         </div>
       )}
     </div>
