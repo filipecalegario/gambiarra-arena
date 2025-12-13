@@ -290,6 +290,28 @@ function Arena() {
             });
             break;
           }
+          case 'round_started': {
+            const newRound = msg.round as number;
+            // Clear all participant content for the new round
+            setParticipantStates((prev) => {
+              const cleared: Record<string, ParticipantState> = {};
+              for (const [pid] of Object.entries(prev)) {
+                cleared[pid] = {
+                  tokens: 0,
+                  isGenerating: true,
+                  content: [],
+                  tokensBySeq: {},
+                  currentRound: newRound,
+                  // Clear metrics from previous round
+                  ttftMs: undefined,
+                  tps: undefined,
+                  durationMs: undefined,
+                };
+              }
+              return cleared;
+            });
+            break;
+          }
           default:
             break;
         }

@@ -99,6 +99,13 @@ export class RoundManager {
       seed: round.seed ?? undefined,
     });
 
+    // Notify telao to clear previous round content
+    this.hub.broadcastToTelao({
+      type: 'round_started',
+      round: round.index,
+      session_id: round.sessionId,
+    });
+
     this.logger.info({ roundId, index: round.index }, 'Round started');
 
     // Log event for research
