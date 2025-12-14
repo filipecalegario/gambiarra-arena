@@ -76,6 +76,14 @@ const roundManager = new RoundManager(prisma, hub, app.log, eventLogger);
 const voteManager = new VoteManager(prisma, app.log, eventLogger);
 const metricsManager = new MetricsManager(prisma);
 
+// Startup cleanup: Mark all participants as disconnected
+// This handles the case where the server crashed or restarted
+// and the database still has stale connected=true records
+await prisma.participant.updateMany({
+  data: { connected: false },
+});
+app.log.info('Startup: Marked all participants as disconnected');
+
 // WebSocket route
 app.register(async (app) => {
   app.get('/ws', { websocket: true }, (socket, request) => {

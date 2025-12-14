@@ -60,30 +60,28 @@ function Arena() {
   const [votingUrl, setVotingUrl] = useState('');
 
   useEffect(() => {
-    const ONLINE_THRESHOLD_MS = 60_000; // 60s: consider participant online if seen within this window
-    // Fetch session data periodically
-    const fetchSession = () => {
-      fetch('/api/session')
-        .then((res) => res.json())
-        .then((data) => {
-          // Prefer explicit `connected` flag; fall back to lastSeen if absent
-          const parts = (data.participants || []).filter((p: Participant) => {
-            if (typeof p.connected === 'boolean') return p.connected;
-            try {
-              if (!p.lastSeen) return false;
-              return Date.now() - new Date(p.lastSeen).getTime() < ONLINE_THRESHOLD_MS;
-            } catch (e) {
-              return false;
-            }
-          });
-
-          setParticipants(parts);
+    // Fetch connected participants from authoritative presence endpoint
+    // Uses in-memory state on server (not database) for accurate live presence
+    const fetchPresence = () => {
+      fetch('/api/presence')
+        .then((res) => {
+          if (!res.ok) {
+            // Fall back to session endpoint if presence not available
+            return fetch('/api/session').then((r) => r.json()).then((data) => ({
+              participants: (data.participants || []).filter((p: Participant) => p.connected),
+            }));
+          }
+          return res.json();
         })
-        .catch((err) => console.error('Failed to fetch session:', err));
+        .then((data) => {
+          // Data from /presence is already filtered to connected participants
+          setParticipants(data.participants || []);
+        })
+        .catch((err) => console.error('Failed to fetch presence:', err));
     };
 
-    fetchSession();
-    const sessionInterval = setInterval(fetchSession, 2000);
+    fetchPresence();
+    const presenceInterval = setInterval(fetchPresence, 2000);
 
     // Fetch current round (or latest round if none active)
     const fetchRound = () => {
@@ -182,7 +180,7 @@ function Arena() {
 
     return () => {
       clearInterval(interval);
-      clearInterval(sessionInterval);
+      clearInterval(presenceInterval);
     };
   }, []);
 

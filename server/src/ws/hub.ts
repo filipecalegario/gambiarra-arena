@@ -18,12 +18,15 @@ interface ParticipantConnection {
   ws: WebSocket;
   lastSeq: Map<number, number>; // round -> last seq
   lastSeen: Date;
+  isAlive: boolean; // Track if connection responded to last ping
 }
 
 export class WebSocketHub {
   private connections = new Map<string, ParticipantConnection>();
   private telaoConnections = new Map<string, WebSocket>();
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private pingInterval: NodeJS.Timeout | null = null;
+  private readonly PING_INTERVAL_MS = 15000; // 15 seconds - ping interval for dead connection detection
   private tokenBuffer = new Map<string, Map<number, string[]>>(); // participantId -> round -> tokens
   private firstTokenTime = new Map<string, Map<number, Date>>(); // participantId -> round -> first token timestamp
   private generationStartTime = new Map<string, Map<number, Date>>(); // participantId -> round -> start timestamp
@@ -34,10 +37,21 @@ export class WebSocketHub {
     private eventLogger?: EventLogger
   ) {
     this.startHeartbeat();
+    this.startPingLoop();
   }
 
   async handleConnection(ws: WebSocket, sessionId?: string) {
     const connId = `conn-${Date.now()}-${Math.random()}`;
+
+    // Listen for pong responses to mark connection as alive
+    ws.on('pong', () => {
+      // Find connection by connId and mark as alive
+      const conn = this.connections.get(connId);
+      if (conn) {
+        conn.isAlive = true;
+        conn.lastSeen = new Date();
+      }
+    });
 
     ws.on('message', async (data) => {
       try {
@@ -149,6 +163,7 @@ export class WebSocketHub {
         ws,
         lastSeq: new Map(),
         lastSeen: new Date(),
+        isAlive: true, // Just connected, so alive
       });
 
       this.logger.debug(
@@ -468,6 +483,64 @@ export class WebSocketHub {
     }, 30000); // 30s
   }
 
+  /**
+   * Ping loop for dead connection detection.
+   * Uses WebSocket protocol-level ping/pong frames (most efficient).
+   * Dead connections are detected and cleaned up within 2 ping cycles (~30s).
+   */
+  private startPingLoop() {
+    this.pingInterval = setInterval(() => {
+      const deadConnIds: string[] = [];
+
+      for (const [connId, conn] of this.connections.entries()) {
+        if (!conn.isAlive) {
+          // Connection didn't respond to last ping - it's dead
+          deadConnIds.push(connId);
+          this.logger.debug(
+            { participantId: conn.participantId },
+            'Dead connection detected via ping/pong'
+          );
+          continue;
+        }
+
+        // Mark as not alive, will be set true when pong received
+        conn.isAlive = false;
+
+        try {
+          conn.ws.ping(); // Send WebSocket ping frame
+        } catch (error) {
+          // Failed to send ping, connection is dead
+          deadConnIds.push(connId);
+          this.logger.debug(
+            { participantId: conn.participantId, error },
+            'Failed to send ping, marking as dead'
+          );
+        }
+      }
+
+      // Clean up dead connections
+      for (const connId of deadConnIds) {
+        const conn = this.connections.get(connId);
+        if (conn) {
+          try {
+            conn.ws.terminate(); // Force close without clean handshake
+          } catch {
+            // Already closed, ignore
+          }
+          // handleDisconnection will update DB and broadcast
+          this.handleDisconnection(connId);
+        }
+      }
+
+      if (deadConnIds.length > 0) {
+        this.logger.info(
+          { count: deadConnIds.length },
+          'Cleaned up dead connections'
+        );
+      }
+    }, this.PING_INTERVAL_MS);
+  }
+
   async getActiveParticipants(sessionId: string) {
     return this.prisma.participant.findMany({
       where: { sessionId },
@@ -523,9 +596,50 @@ export class WebSocketHub {
     return this.connections.size;
   }
 
+  /**
+   * Get currently connected participants from in-memory state.
+   * This is the authoritative source for live presence - more reliable than database.
+   */
+  getLiveConnectedParticipants(): Array<{
+    participantId: string;
+    sessionId: string;
+    lastSeen: Date;
+  }> {
+    const result: Array<{
+      participantId: string;
+      sessionId: string;
+      lastSeen: Date;
+    }> = [];
+
+    for (const conn of this.connections.values()) {
+      result.push({
+        participantId: conn.participantId,
+        sessionId: conn.sessionId,
+        lastSeen: conn.lastSeen,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if a specific participant is currently connected
+   */
+  isParticipantConnected(participantId: string): boolean {
+    for (const conn of this.connections.values()) {
+      if (conn.participantId === participantId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   cleanup() {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+    }
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
     }
 
     for (const conn of this.connections.values()) {

@@ -85,6 +85,59 @@ export async function setupRoutes(
     return sessionData;
   });
 
+  // Get live presence (authoritative source for connected participants)
+  // Uses in-memory connection state instead of database for accuracy
+  app.get('/presence', async (request, reply) => {
+    const session = await app.prisma.session.findFirst({
+      where: { status: 'active' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!session) {
+      return reply.code(404).send({ error: 'No active session' });
+    }
+
+    // Get live connections from memory (authoritative source)
+    const liveConnections = hub.getLiveConnectedParticipants();
+
+    // Filter to current session only
+    const sessionParticipantIds = liveConnections
+      .filter((c) => c.sessionId === session.id)
+      .map((c) => c.participantId);
+
+    // Fetch full participant data for connected participants only
+    const participants = await app.prisma.participant.findMany({
+      where: {
+        id: { in: sessionParticipantIds },
+        sessionId: session.id,
+      },
+      select: {
+        id: true,
+        nickname: true,
+        runner: true,
+        model: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Add live connection info
+    const participantsWithStatus = participants.map((p) => {
+      const liveConn = liveConnections.find((c) => c.participantId === p.id);
+      return {
+        ...p,
+        connected: true, // Always true since we filtered by live connections
+        lastSeen: liveConn?.lastSeen.toISOString(),
+      };
+    });
+
+    return {
+      sessionId: session.id,
+      connectedCount: participantsWithStatus.length,
+      participants: participantsWithStatus,
+    };
+  });
+
   // Get current round
   app.get('/rounds/current', async (request, reply) => {
     const session = await app.prisma.session.findFirst({
