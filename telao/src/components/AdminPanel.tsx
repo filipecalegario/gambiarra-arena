@@ -43,26 +43,6 @@ interface PromptTemplate {
   svgMode?: boolean;
 }
 
-const storyContinuationPrompt = `📖 CONTINUAÇÃO DE HISTÓRIA — CAPÍTULO 1
-
-Continue a narrativa abaixo com criatividade, coerência e personalidade.
-
-REGRAS
-- Escreva entre 180 e 260 palavras.
-- Preserve personagens, cenário e fatos já estabelecidos.
-- Faça a história avançar com uma virada surpreendente, mas plausível.
-- Use humor quando ele combinar com a cena, sem transformar tudo em piada.
-- Não explique suas escolhas e não escreva nada fora da narrativa.
-- Não encerre definitivamente a história: deixe um gancho para o próximo capítulo.
-
-CRITÉRIOS DA VOTAÇÃO
-- Coerência narrativa: 40%.
-- Criatividade e originalidade: 35%.
-- Estilo e humor: 25%.
-
-HISTÓRIA ATÉ AGORA
-Às 23h47, todos os computadores da arena desligaram ao mesmo tempo. Só um notebook permaneceu aceso: um Celeron de 2012 rodando um modelo que ninguém lembrava de ter instalado. Na tela, apareceu a mensagem: “Não desliguem o roteador. Eu tenho uma história para terminar.” Então a porta do laboratório se trancou por dentro...`;
-
 const promptTemplates: PromptTemplate[] = [
   {
     label: 'Capivara em SVG',
@@ -88,13 +68,6 @@ const promptTemplates: PromptTemplate[] = [
   {
     label: 'Receita maluca',
     prompt: 'Crie uma receita maluca com ingredientes inusitados',
-  },
-  {
-    label: 'Continuação de História',
-    prompt: storyContinuationPrompt,
-    maxTokens: 500,
-    temperature: 0.9,
-    deadlineMs: 120000,
   },
 ];
 

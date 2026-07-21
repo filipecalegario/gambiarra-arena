@@ -42,6 +42,7 @@ Perguntas capciosas que testam raciocínio e conhecimento.
 Todos os LLMs continuam o mesmo trecho; a opção mais votada pelo público vira
 parte oficial da história e alimenta o capítulo seguinte.
 - **Critérios:** Coerência narrativa, criatividade, estilo e humor
+- **Modo dedicado:** `/story-control`, `/story` e `/story-voting`
 - **Como organizar:** [guia completo da competição](docs/desafios/CONTINUACAO-DE-HISTORIA.md)
 
 ### 🎭 Personagem Oculto

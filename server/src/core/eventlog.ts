@@ -23,10 +23,15 @@ export type EventType =
   | 'world_joined'
   | 'world_stopped'
   | 'world_snapshot'
-  | 'agent_prompt_changed';
+  | 'agent_prompt_changed'
+  | 'story_created'
+  | 'story_chapter_started'
+  | 'story_voting_opened'
+  | 'story_chapter_canonized'
+  | 'story_completed';
 
 export type ActorType = 'admin' | 'participant' | 'voter' | 'system';
-export type TargetType = 'session' | 'round' | 'participant' | 'vote' | 'metrics' | 'world';
+export type TargetType = 'session' | 'round' | 'participant' | 'vote' | 'metrics' | 'world' | 'story' | 'story_chapter';
 
 export interface LogEventParams {
   sessionId?: string;

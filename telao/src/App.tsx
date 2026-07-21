@@ -5,8 +5,11 @@ import Scoreboard from './components/Scoreboard';
 import { AdminPanel } from './components/AdminPanel';
 import WorldArena from './components/WorldArena';
 import { WorldControl } from './components/WorldControl';
+import { StoryControl } from './components/StoryControl';
+import { StoryArena } from './components/StoryArena';
+import { StoryVoting } from './components/StoryVoting';
 
-type View = 'arena' | 'voting' | 'scoreboard' | 'admin' | 'world' | 'control';
+type View = 'arena' | 'voting' | 'scoreboard' | 'admin' | 'world' | 'control' | 'story' | 'story-control' | 'story-voting';
 
 const PAGE_TITLES: Record<View, string> = {
   arena: 'Arena | Gambiarra',
@@ -15,6 +18,9 @@ const PAGE_TITLES: Record<View, string> = {
   admin: 'Admin | Gambiarra',
   world: 'Mundo | Gambiarra',
   control: 'Controle do Mundo | Gambiarra',
+  story: 'Cânone Comunitário | Gambiarra',
+  'story-control': 'Controle do Cânone | Gambiarra',
+  'story-voting': 'Votação do Cânone | Gambiarra',
 };
 
 function getViewFromPath(): View {
@@ -24,6 +30,9 @@ function getViewFromPath(): View {
   if (path === '/admin') return 'admin';
   if (path === '/world') return 'world';
   if (path === '/control') return 'control';
+  if (path === '/story') return 'story';
+  if (path === '/story-control') return 'story-control';
+  if (path === '/story-voting') return 'story-voting';
   return 'arena';
 }
 
@@ -46,6 +55,12 @@ function App() {
         return <WorldArena />;
       case 'control':
         return <WorldControl />;
+      case 'story':
+        return <StoryArena />;
+      case 'story-control':
+        return <StoryControl />;
+      case 'story-voting':
+        return <StoryVoting />;
       default:
         return <Arena />;
     }

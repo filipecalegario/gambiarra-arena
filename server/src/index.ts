@@ -10,6 +10,7 @@ import { MetricsManager } from './core/metrics.js';
 import { EventLogger } from './core/eventlog.js';
 import { WorldEngine } from './core/world.js';
 import { setupRoutes } from './http/routes.js';
+import { StoryManager } from './core/story.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -130,6 +131,7 @@ const metricsManager = new MetricsManager(prisma);
 // Agent world (2D arena mode) — shares the same WS hub
 const worldEngine = new WorldEngine(hub, app.log, eventLogger);
 hub.setWorldEngine(worldEngine);
+const storyManager = new StoryManager(prisma, roundManager, hub, app.log, eventLogger);
 
 // SQLite tuning for bursts of concurrent connects/disconnects (e.g. 25+ people
 // joining at once). WAL lets readers and the writer work without blocking each
@@ -248,7 +250,7 @@ app.get('/client-assets/:file', { config: { rateLimit: false } }, async (request
 });
 
 // HTTP routes
-await setupRoutes(app, hub, roundManager, voteManager, metricsManager, worldEngine, eventLogger);
+await setupRoutes(app, hub, roundManager, voteManager, metricsManager, worldEngine, storyManager, eventLogger);
 
 // ---- Automatic data snapshots ----
 // Dump the active session's full data (participants, rounds, metrics, votes,
@@ -264,6 +266,7 @@ async function dumpSnapshot(reason: string) {
       include: {
         participants: true,
         rounds: { include: { metrics: true, votes: true } },
+        stories: { include: { chapters: true } },
         events: { orderBy: { timestamp: 'asc' } },
       },
     });

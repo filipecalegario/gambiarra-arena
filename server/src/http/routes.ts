@@ -8,6 +8,7 @@ import { MetricsManager } from '../core/metrics.js';
 import { EventLogger } from '../core/eventlog.js';
 import type { WorldEngine } from '../core/world.js';
 import type { WebSocketHub } from '../ws/hub.js';
+import type { StoryManager } from '../core/story.js';
 
 const CreateSessionSchema = z.object({
   pinLength: z.number().optional().default(6),
@@ -58,6 +59,15 @@ const WorldStartSchema = z.object({
   foodCount: z.number().int().min(1).max(100).optional(),
 });
 
+const CreateStorySchema = z.object({
+  title: z.string().trim().min(3).max(120),
+  seedText: z.string().trim().min(40).max(12000),
+  totalChapters: z.number().int().min(1).max(10),
+  maxTokens: z.number().int().min(100).max(2000).optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  deadlineMs: z.number().int().min(30000).max(600000).optional(),
+});
+
 export async function setupRoutes(
   app: FastifyInstance,
   hub: WebSocketHub,
@@ -65,6 +75,7 @@ export async function setupRoutes(
   voteManager: VoteManager,
   metricsManager: MetricsManager,
   worldEngine: WorldEngine,
+  storyManager: StoryManager,
   eventLogger?: EventLogger
 ) {
   // Health check
@@ -95,6 +106,52 @@ export async function setupRoutes(
   // Current world snapshot (debugging / polling fallback)
   app.get('/world/state', async () => {
     return worldEngine.snapshot();
+  });
+
+  // ============ COMMUNITY CANON (collaborative story competition) ============
+
+  const activeSession = () => app.prisma.session.findFirst({ where: { status: 'active' }, orderBy: { createdAt: 'desc' } });
+
+  app.get('/story/state', async (_request, reply) => {
+    const session = await activeSession();
+    if (!session) return reply.code(404).send({ error: 'No active session' });
+    return { story: await storyManager.getState(session.id) };
+  });
+
+  app.post('/story', async (request, reply) => {
+    const body = CreateStorySchema.parse(request.body);
+    const session = await activeSession();
+    if (!session) return reply.code(404).send({ error: 'No active session' });
+    try {
+      return await storyManager.create({ sessionId: session.id, ...body });
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to create story' });
+    }
+  });
+
+  app.post('/story/:storyId/chapters/start', async (request, reply) => {
+    try {
+      return await storyManager.startNextChapter((request.params as { storyId: string }).storyId);
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to start chapter' });
+    }
+  });
+
+  app.post('/story/:storyId/chapters/stop', async (request, reply) => {
+    try {
+      await storyManager.openVoting((request.params as { storyId: string }).storyId);
+      return { status: 'ok' };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to open voting' });
+    }
+  });
+
+  app.post('/story/:storyId/canonize', async (request, reply) => {
+    try {
+      return { status: 'ok', winner: await storyManager.canonize((request.params as { storyId: string }).storyId) };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to canonize chapter' });
+    }
   });
 
   // Get active session
