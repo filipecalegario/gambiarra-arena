@@ -34,6 +34,70 @@ interface Participant {
   lastSeen: string;
 }
 
+interface PromptTemplate {
+  label: string;
+  prompt: string;
+  maxTokens?: number;
+  temperature?: number;
+  deadlineMs?: number;
+  svgMode?: boolean;
+}
+
+const storyContinuationPrompt = `📖 CONTINUAÇÃO DE HISTÓRIA — CAPÍTULO 1
+
+Continue a narrativa abaixo com criatividade, coerência e personalidade.
+
+REGRAS
+- Escreva entre 180 e 260 palavras.
+- Preserve personagens, cenário e fatos já estabelecidos.
+- Faça a história avançar com uma virada surpreendente, mas plausível.
+- Use humor quando ele combinar com a cena, sem transformar tudo em piada.
+- Não explique suas escolhas e não escreva nada fora da narrativa.
+- Não encerre definitivamente a história: deixe um gancho para o próximo capítulo.
+
+CRITÉRIOS DA VOTAÇÃO
+- Coerência narrativa: 40%.
+- Criatividade e originalidade: 35%.
+- Estilo e humor: 25%.
+
+HISTÓRIA ATÉ AGORA
+Às 23h47, todos os computadores da arena desligaram ao mesmo tempo. Só um notebook permaneceu aceso: um Celeron de 2012 rodando um modelo que ninguém lembrava de ter instalado. Na tela, apareceu a mensagem: “Não desliguem o roteador. Eu tenho uma história para terminar.” Então a porta do laboratório se trancou por dentro...`;
+
+const promptTemplates: PromptTemplate[] = [
+  {
+    label: 'Capivara em SVG',
+    prompt: 'Crie o SVG de uma capivara dançando frevo',
+    svgMode: true,
+  },
+  {
+    label: 'Poesia em xote',
+    prompt: 'Escreva uma poesia em métrica de xote pernambucano sobre IA',
+  },
+  {
+    label: 'Ficção científica',
+    prompt: 'Conte uma história curta de ficção científica sobre robôs',
+  },
+  {
+    label: 'Entropia criativa',
+    prompt: 'Explique o conceito de entropia de forma criativa',
+  },
+  {
+    label: 'Diálogo histórico',
+    prompt: 'Escreva um diálogo entre dois personagens históricos',
+  },
+  {
+    label: 'Receita maluca',
+    prompt: 'Crie uma receita maluca com ingredientes inusitados',
+  },
+  {
+    label: 'Continuação de História',
+    prompt: storyContinuationPrompt,
+    maxTokens: 500,
+    temperature: 0.9,
+    deadlineMs: 120000,
+  },
+];
+
 export function AdminPanel() {
   const toast = useToast();
   const [session, setSession] = useState<Session | null>(null);
@@ -49,16 +113,6 @@ export function AdminPanel() {
   const [temperature, setTemperature] = useState(0.7);
   const [deadlineMs, setDeadlineMs] = useState(120000);
   const [svgMode, setSvgMode] = useState(false);
-
-  // Predefined prompt templates
-  const promptTemplates = [
-    'Crie o SVG de uma capivara dançando frevo',
-    'Escreva uma poesia em métrica de xote pernambucano sobre IA',
-    'Conte uma história curta de ficção científica sobre robôs',
-    'Explique o conceito de entropia de forma criativa',
-    'Escreva um diálogo entre dois personagens históricos',
-    'Crie uma receita maluca com ingredientes inusitados',
-  ];
 
   // Compute round status based on startedAt/endedAt
   const getRoundStatus = (round: Round): 'pending' | 'active' | 'completed' => {
@@ -416,28 +470,26 @@ export function AdminPanel() {
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <span className="text-sm text-gray-400">Sugestões:</span>
-                  {promptTemplates.map((template, idx) => {
-                    const isSvgTemplate = template.toLowerCase().includes('svg');
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setNewPrompt(template);
-                          if (isSvgTemplate) {
-                            setSvgMode(true);
-                          }
-                        }}
-                        className={`text-xs px-2 py-1 rounded ${
-                          isSvgTemplate
-                            ? 'bg-primary/20 border border-primary text-primary hover:bg-primary/30'
-                            : 'bg-gray-600 hover:bg-gray-500'
-                        }`}
-                      >
-                        {isSvgTemplate && '🎨 '}
-                        {template.substring(0, 30)}...
-                      </button>
-                    );
-                  })}
+                  {promptTemplates.map((template) => (
+                    <button
+                      key={template.label}
+                      onClick={() => {
+                        setNewPrompt(template.prompt);
+                        setSvgMode(template.svgMode ?? false);
+                        if (template.maxTokens !== undefined) setMaxTokens(template.maxTokens);
+                        if (template.temperature !== undefined) setTemperature(template.temperature);
+                        if (template.deadlineMs !== undefined) setDeadlineMs(template.deadlineMs);
+                      }}
+                      className={`text-xs px-2 py-1 rounded ${
+                        template.svgMode
+                          ? 'bg-primary/20 border border-primary text-primary hover:bg-primary/30'
+                          : 'bg-gray-600 hover:bg-gray-500'
+                      }`}
+                    >
+                      {template.svgMode && '🎨 '}
+                      {template.label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">

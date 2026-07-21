@@ -39,8 +39,10 @@ Perguntas capciosas que testam raciocínio e conhecimento.
 - **Critérios:** Precisão factual, detecção de pegadinhas, qualidade da explicação
 
 ### 📖 Continuação de História
-Cada LLM continua a história do anterior.
-- **Critérios:** Coesão narrativa, originalidade, engajamento do público
+Todos os LLMs continuam o mesmo trecho; a opção mais votada pelo público vira
+parte oficial da história e alimenta o capítulo seguinte.
+- **Critérios:** Coerência narrativa, criatividade, estilo e humor
+- **Como organizar:** [guia completo da competição](docs/desafios/CONTINUACAO-DE-HISTORIA.md)
 
 ### 🎭 Personagem Oculto
 Imitar celebridades ou personagens sem revelá-los explicitamente.

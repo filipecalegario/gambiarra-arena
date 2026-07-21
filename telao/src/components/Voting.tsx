@@ -393,6 +393,14 @@ function Voting() {
         <p className="text-sm text-gray-400 font-body mb-3 max-w-md mx-auto line-clamp-2">
           {round.prompt}
         </p>
+        <details className="mb-3 max-w-md mx-auto text-left">
+          <summary className="cursor-pointer text-xs font-mono text-neon-cyan hover:text-white">
+            Ver desafio e critérios completos
+          </summary>
+          <div className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--color-surface-light)] bg-[var(--color-midnight)] p-3 text-xs leading-relaxed text-gray-300">
+            {round.prompt}
+          </div>
+        </details>
         <div className="flex justify-center gap-4 text-sm font-mono">
           <span className="text-gray-500">
             <span className="text-neon-cyan font-bold">{currentIndex + 1}</span>/{totalResponses}
