@@ -21,10 +21,23 @@ seguinte.
 3. Inicie o capítulo. O servidor monta o prompt com todo o cânone acumulado.
 4. Quando as respostas chegarem, encerre a geração para abrir a votação.
 5. O público avalia cada texto em `/story-voting`.
-6. Clique em **Tornar vencedor cânone**. A maior média vence e o texto é
-   incorporado sem edição.
+6. Clique em **Tornar vencedor cânone (por votos)**. A maior média vence e o
+   texto é incorporado sem edição. Se ninguém votou, o botão ainda funciona
+   (escolha determinística por id estável); para decidir você mesmo — ou
+   desempatar — use os botões **Escolher manualmente** logo abaixo.
 7. Repita. No capítulo final, `/story` apresenta a obra completa e os autores
    vencedores de cada trecho.
+
+## Recuperação ao vivo
+
+Se um capítulo travar — ninguém conectado gerou continuação, ou os modelos
+falharam — use **Cancelar capítulo** em `/story-control`. As continuações e
+votos daquele capítulo são descartados, a história volta ao capítulo anterior e
+você pode reiniciá-lo. O cânone já consolidado não é afetado.
+
+Em histórias longas, o prompt de cada capítulo mantém a abertura e os capítulos
+mais recentes do cânone, resumindo o miolo, para não estourar o contexto de
+modelos pequenos.
 
 ## Rubrica
 

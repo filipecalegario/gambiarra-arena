@@ -11,21 +11,72 @@ export interface StoryWinnerCandidate {
   scores: number[];
 }
 
+function enrichCandidate(candidate: StoryWinnerCandidate) {
+  return {
+    ...candidate,
+    average: candidate.scores.length
+      ? candidate.scores.reduce((sum, score) => sum + score, 0) / candidate.scores.length
+      : null,
+    voteCount: candidate.scores.length,
+    fiveCount: candidate.scores.filter((score) => score === 5).length,
+  };
+}
+
 export function chooseStoryWinner(candidates: StoryWinnerCandidate[]) {
   return candidates
     .filter((candidate) => candidate.content.trim() && candidate.scores.length > 0)
-    .map((candidate) => ({
-      ...candidate,
-      average: candidate.scores.reduce((sum, score) => sum + score, 0) / candidate.scores.length,
-      voteCount: candidate.scores.length,
-      fiveCount: candidate.scores.filter((score) => score === 5).length,
-    }))
+    .map(enrichCandidate)
     .sort((a, b) =>
-      b.average - a.average ||
+      (b.average ?? 0) - (a.average ?? 0) ||
       b.voteCount - a.voteCount ||
       b.fiveCount - a.fiveCount ||
       a.participantId.localeCompare(b.participantId)
     )[0] ?? null;
+}
+
+export function pickStoryWinner(
+  candidates: StoryWinnerCandidate[],
+  opts: { forcedParticipantId?: string } = {}
+) {
+  const withContent = candidates.filter((candidate) => candidate.content.trim());
+
+  if (opts.forcedParticipantId) {
+    const forced = withContent.find((candidate) => candidate.participantId === opts.forcedParticipantId);
+    return forced ? enrichCandidate(forced) : null;
+  }
+
+  const voted = chooseStoryWinner(candidates);
+  if (voted) return voted;
+
+  const fallback = [...withContent].sort((a, b) => a.participantId.localeCompare(b.participantId))[0];
+  return fallback ? enrichCandidate(fallback) : null;
+}
+
+const CANON_HEAD_CHARS = 900;
+const CANON_TAIL_CHARS = 2600;
+const CANON_OMISSION_MARK = '\n\n[…capítulos intermediários omitidos para caber no contexto…]\n\n';
+
+function snapBack(text: string, index: number) {
+  for (const sep of ['\n\n', '\n', ' ']) {
+    const at = text.lastIndexOf(sep, index);
+    if (at > 0) return at + sep.length;
+  }
+  return index;
+}
+function snapForward(text: string, index: number) {
+  for (const sep of ['\n\n', '\n', ' ']) {
+    const at = text.indexOf(sep, index);
+    if (at !== -1 && at < text.length - 1) return at + sep.length;
+  }
+  return index;
+}
+
+export function clampCanon(canonText: string) {
+  const text = canonText.trim();
+  if (text.length <= CANON_HEAD_CHARS + CANON_TAIL_CHARS + CANON_OMISSION_MARK.length) return text;
+  const head = text.slice(0, snapBack(text, CANON_HEAD_CHARS)).trim();
+  const tail = text.slice(snapForward(text, text.length - CANON_TAIL_CHARS)).trim();
+  return `${head}${CANON_OMISSION_MARK}${tail}`;
 }
 
 export function buildStoryPrompt(input: {
@@ -36,7 +87,7 @@ export function buildStoryPrompt(input: {
 }) {
   const finalChapter = input.chapter === input.totalChapters;
   return `COMPETIÇÃO: CÂNONE COMUNITÁRIO — ${input.title}\n\n` +
-    `CÂNONE ATUAL (preserve fatos, personagens e tom):\n---\n${input.canonText}\n---\n\n` +
+    `CÂNONE ATUAL (preserve fatos, personagens e tom):\n---\n${clampCanon(input.canonText)}\n---\n\n` +
     `Escreva APENAS a continuação correspondente ao capítulo ${input.chapter} de ${input.totalChapters}. ` +
     `Não resuma nem repita o cânone. Produza de 180 a 260 palavras, com coerência, criatividade e estilo próprio. ` +
     `Use humor quando combinar com a história. ` +
@@ -154,28 +205,44 @@ export class StoryManager {
     await this.broadcast(story.sessionId);
   }
 
-  async canonize(storyId: string) {
+  async canonize(storyId: string, opts: { participantId?: string } = {}) {
     const story = await this.prisma.storyCompetition.findUnique({ where: { id: storyId }, include: { chapters: { orderBy: { index: 'desc' }, take: 1, include: { round: { include: { metrics: { include: { participant: true } }, votes: true } } } } } });
     if (!story) throw new Error('História não encontrada');
     if (story.status !== 'voting') throw new Error('A votação deste capítulo não está aberta');
     const chapter = story.chapters[0];
-    const winner = chooseStoryWinner(chapter.round.metrics.map((metric) => ({
+    const winner = pickStoryWinner(chapter.round.metrics.map((metric) => ({
       participantId: metric.participantId,
       nickname: metric.participant.nickname,
       content: metric.generatedContent ?? '',
       scores: chapter.round.votes.filter((vote) => vote.participantId === metric.participantId).map((vote) => vote.score),
-    })));
-    if (!winner) throw new Error('É necessário ao menos um voto válido para definir o cânone');
+    })), { forcedParticipantId: opts.participantId });
+    if (!winner) throw new Error(opts.participantId ? 'A continuação escolhida não foi encontrada ou está vazia' : 'Não há continuações para tornar cânone');
+    const manual = !!opts.participantId;
     await this.rounds.closeVoting(chapter.roundId);
     const completed = story.currentChapter === story.totalChapters;
     await this.prisma.$transaction([
       this.prisma.storyChapter.update({ where: { id: chapter.id }, data: { winningParticipantId: winner.participantId, winningNickname: winner.nickname, winningContent: winner.content.trim(), winningScore: winner.average, winningVotes: winner.voteCount, canonicalizedAt: new Date() } }),
       this.prisma.storyCompetition.update({ where: { id: storyId }, data: { canonText: `${story.canonText.trim()}\n\n${winner.content.trim()}`, status: completed ? 'completed' : 'ready', completedAt: completed ? new Date() : null } }),
     ]);
-    await this.eventLogger?.log({ sessionId: story.sessionId, eventType: 'story_chapter_canonized', actorType: 'system', targetType: 'story_chapter', targetId: chapter.id, metadata: { participantId: winner.participantId, nickname: winner.nickname, average: winner.average, votes: winner.voteCount } });
+    await this.eventLogger?.log({ sessionId: story.sessionId, eventType: 'story_chapter_canonized', actorType: manual ? 'admin' : 'system', targetType: 'story_chapter', targetId: chapter.id, metadata: { participantId: winner.participantId, nickname: winner.nickname, average: winner.average, votes: winner.voteCount, manual } });
     if (completed) await this.eventLogger?.log({ sessionId: story.sessionId, eventType: 'story_completed', actorType: 'system', targetType: 'story', targetId: story.id });
-    this.logger.info({ storyId, chapter: chapter.index, winner: winner.nickname }, 'Story chapter added to canon');
+    this.logger.info({ storyId, chapter: chapter.index, winner: winner.nickname, manual }, 'Story chapter added to canon');
     await this.broadcast(story.sessionId);
     return winner;
+  }
+
+  async cancelChapter(storyId: string) {
+    const story = await this.prisma.storyCompetition.findUnique({ where: { id: storyId }, include: { chapters: { orderBy: { index: 'desc' }, take: 1 } } });
+    if (!story) throw new Error('História não encontrada');
+    if (story.status !== 'generating' && story.status !== 'voting') throw new Error('Só é possível cancelar um capítulo em geração ou votação');
+    const chapter = story.chapters[0];
+    if (!chapter || chapter.canonicalizedAt) throw new Error('Não há capítulo ativo para cancelar');
+    await this.prisma.round.delete({ where: { id: chapter.roundId } });
+    await this.prisma.storyCompetition.update({ where: { id: storyId }, data: { currentChapter: Math.max(0, story.currentChapter - 1), status: 'ready' } });
+    await this.eventLogger?.log({ sessionId: story.sessionId, eventType: 'story_chapter_cancelled', actorType: 'admin', targetType: 'story_chapter', targetId: chapter.id, metadata: { index: chapter.index } });
+    this.hub.broadcastToTelao({ type: 'round_started', round: Math.max(0, story.currentChapter - 1), session_id: story.sessionId });
+    await this.broadcast(story.sessionId);
+    this.logger.info({ storyId, chapter: chapter.index }, 'Story chapter cancelled and rolled back');
+    return { cancelledChapter: chapter.index };
   }
 }

@@ -68,6 +68,10 @@ const CreateStorySchema = z.object({
   deadlineMs: z.number().int().min(30000).max(600000).optional(),
 });
 
+const CanonizeSchema = z.object({
+  participantId: z.string().optional(),
+});
+
 export async function setupRoutes(
   app: FastifyInstance,
   hub: WebSocketHub,
@@ -146,9 +150,18 @@ export async function setupRoutes(
     }
   });
 
+  app.post('/story/:storyId/chapters/cancel', async (request, reply) => {
+    try {
+      return { status: 'ok', ...await storyManager.cancelChapter((request.params as { storyId: string }).storyId) };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to cancel chapter' });
+    }
+  });
+
   app.post('/story/:storyId/canonize', async (request, reply) => {
     try {
-      return { status: 'ok', winner: await storyManager.canonize((request.params as { storyId: string }).storyId) };
+      const body = CanonizeSchema.parse(request.body ?? {});
+      return { status: 'ok', winner: await storyManager.canonize((request.params as { storyId: string }).storyId, body) };
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to canonize chapter' });
     }
