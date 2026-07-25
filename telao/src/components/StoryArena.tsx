@@ -6,12 +6,12 @@ export function StoryArena() {
   const [story, setStory] = useState<Story | null>(null);
   const [live, setLive] = useState<Record<string,string>>({});
   const reload = useCallback(() => fetchStory().then(setStory).catch(() => undefined), []);
-  useEffect(() => { reload(); const timer=setInterval(reload,10000); return()=>clearInterval(timer); }, [reload]);
-  useTelaoSocket('story', useCallback((message:any) => {
+  const connected = useTelaoSocket('story', useCallback((message:any) => {
     if (message.type === 'story_state') setStory(message.story);
     if (message.type === 'round_started') setLive({});
     if (message.type === 'token_update') setLive(old => ({...old,[message.participant_id]:(old[message.participant_id]||'')+message.content}));
   }, []));
+  useEffect(() => { reload(); const timer=setInterval(reload, connected ? 30000 : 8000); return()=>clearInterval(timer); }, [reload, connected]);
   if (!story) return <main className="min-h-screen bg-[#090b16] text-white grid place-items-center"><div className="text-center"><p className="text-7xl mb-4">📖</p><h1 className="text-4xl font-black">Cânone comunitário</h1><p className="text-slate-400 mt-3">Aguardando o começo da história…</p></div></main>;
   const chapter=story.chapters[story.chapters.length-1];
   const responses=chapter?.round.responses ?? [];

@@ -12,8 +12,9 @@ export function StoryControl() {
   const [newStoryMode, setNewStoryMode] = useState(false);
   const [form, setForm] = useState({ title: 'O último roteador', seedText: 'Às 23h47, todos os computadores da arena desligaram ao mesmo tempo. Só um notebook permaneceu aceso: um Celeron de 2012 rodando um modelo que ninguém lembrava de ter instalado. Na tela apareceu: “Não desliguem o roteador. Eu tenho uma história para terminar.” Então a porta do laboratório se trancou por dentro.', totalChapters: 3, maxTokens: 500, temperature: 0.9, deadlineMs: 120000 });
   const reload = useCallback(() => fetchStory().then(setStory).catch(() => undefined), []);
-  useEffect(() => { fetch('/api/session').then(r => r.ok ? r.json() : null).then(setSession); reload(); const timer = setInterval(reload, 10000); return () => clearInterval(timer); }, [reload]);
-  useTelaoSocket('story-control', useCallback((message: any) => { if (message.type === 'story_state') setStory(message.story); }, []));
+  useEffect(() => { fetch('/api/session').then(r => r.ok ? r.json() : null).then(setSession); }, []);
+  const connected = useTelaoSocket('story-control', useCallback((message: any) => { if (message.type === 'story_state') setStory(message.story); }, []));
+  useEffect(() => { reload(); const timer = setInterval(reload, connected ? 30000 : 8000); return () => clearInterval(timer); }, [reload, connected]);
 
   const request = async (path: string, body?: unknown) => {
     setBusy(true); setError('');

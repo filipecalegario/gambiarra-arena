@@ -6,8 +6,8 @@ function voterId(){const key='gambiarra-voter-id';let id=localStorage.getItem(ke
 export function StoryVoting(){
   const [story,setStory]=useState<Story|null>(null); const [votes,setVotes]=useState<Record<string,number>>({}); const [error,setError]=useState(''); const id=useMemo(voterId,[]);
   const reload=useCallback(async()=>{const next=await fetchStory();setStory(next);const chapter=next?.chapters[next.chapters.length-1];if(next?.status==='voting'&&chapter){const r=await fetch(`/api/votes/mine?roundId=${chapter.round.id}&voterId=${id}`);if(r.ok){const data=await r.json();setVotes(Object.fromEntries(data.map((v:any)=>[v.participantId,v.score])))}}},[id]);
-  useEffect(()=>{reload();const timer=setInterval(reload,10000);return()=>clearInterval(timer)},[reload]);
-  useTelaoSocket('story-voting',useCallback((m:any)=>{if(m.type==='story_state')setStory(m.story)},[]));
+  const connected=useTelaoSocket('story-voting',useCallback((m:any)=>{if(m.type==='story_state')setStory(m.story)},[]));
+  useEffect(()=>{reload();const timer=setInterval(reload, connected ? 30000 : 8000);return()=>clearInterval(timer)},[reload, connected]);
   const chapter=story?.chapters[story.chapters.length-1]; const responses=useMemo(()=>chapter?[...chapter.round.responses].sort((a,b)=>a.participantId.localeCompare(b.participantId)):[],[chapter]);
   const vote=async(participantId:string,score:number)=>{if(!chapter)return;setError('');const r=await fetch('/api/votes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roundId:chapter.round.id,participantId,score,voterId:id,userAgent:navigator.userAgent})});if(r.ok)setVotes(old=>({...old,[participantId]:score}));else setError((await r.json().catch(()=>({}))).error||'Não foi possível votar')};
   if(!story||story.status!=='voting')return <main className="min-h-screen bg-slate-950 text-white grid place-items-center p-6"><div className="max-w-lg text-center"><p className="text-6xl">🗳️</p><h1 className="text-3xl font-black mt-5">Votação ainda não está aberta</h1><p className="text-slate-400 mt-3">Esta tela muda automaticamente quando as continuações estiverem prontas.</p></div></main>;
