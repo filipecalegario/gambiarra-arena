@@ -64,6 +64,23 @@ controla uma criatura. Tem mensagens WS próprias (`world_join`, `agent_action`,
 próprios no event log (incluindo `world_snapshot` a cada 5 s com o estado
 completo — mantenha isso em qualquer modo novo dessa família!).
 
+### 4. Modo Cânone Comunitário (`/story`) — narrativa colaborativa por rodadas
+
+Uma competição de continuação de história: cada capítulo é uma **rodada normal**
+(reusa `RoundManager`), orquestrada por um `StoryManager` que mantém o cânone
+acumulado, monta o prompt de cada capítulo, abre a votação e consagra a
+continuação vencedora (por votos, escolha manual do apresentador ou fallback
+determinístico). Tem telas próprias (`StoryControl`, `StoryArena`, `StoryVoting`),
+rotas REST próprias (`/story*`) e eventos próprios (`story_created`,
+`story_chapter_started`, `story_voting_opened`, `story_chapter_canonized`,
+`story_chapter_cancelled`, `story_discarded`, `story_completed`).
+
+**Não** introduz mensagem WS *inbound* nova: reaproveita `challenge`/`token`/
+`complete` e faz *push* do estado ao telão via `story_state` (broadcast, como
+`round_state`) — o polling das telas é só fallback adaptativo. É o gabarito para
+modos que **encadeiam rodadas** com estado persistente entre elas. Guia de uso e
+operação ao vivo: **[CONTINUACAO-DE-HISTORIA.md](CONTINUACAO-DE-HISTORIA.md)**.
+
 ---
 
 ## Mapa do repositório (o que mora onde)
@@ -77,6 +94,8 @@ completo — mantenha isso em qualquer modo novo dessa família!).
 | `server/src/ws/schemas.ts` | **Contrato Zod de TODAS as mensagens WS** | B (A não mexe) |
 | `server/src/ws/hub.ts` | Roteia mensagens WS; snapshot ao registrar telão | B (A não mexe) |
 | `server/src/core/world.ts` | Motor do World (gabarito de engine da Receita B) | B |
+| `server/src/core/story.ts` | Orquestra o Cânone Comunitário (cânone, capítulos, vencedor) | história |
+| `telao/src/components/Story*.tsx` | Controle, telão e votação do Cânone Comunitário | história |
 | `server/src/core/eventlog.ts` | União `EventType` — todo evento novo entra aqui | B |
 | `telao/src/App.tsx` | Roteamento por caminho (`/voting`, `/world`, …) | B |
 | `telao/src/components/AdminPanel.tsx` | Formulário de criação de rodada | A |

@@ -34,6 +34,43 @@ interface Participant {
   lastSeen: string;
 }
 
+interface PromptTemplate {
+  label: string;
+  prompt: string;
+  maxTokens?: number;
+  temperature?: number;
+  deadlineMs?: number;
+  svgMode?: boolean;
+}
+
+const promptTemplates: PromptTemplate[] = [
+  {
+    label: 'Capivara em SVG',
+    prompt: 'Crie o SVG de uma capivara dançando frevo',
+    svgMode: true,
+  },
+  {
+    label: 'Poesia em xote',
+    prompt: 'Escreva uma poesia em métrica de xote pernambucano sobre IA',
+  },
+  {
+    label: 'Ficção científica',
+    prompt: 'Conte uma história curta de ficção científica sobre robôs',
+  },
+  {
+    label: 'Entropia criativa',
+    prompt: 'Explique o conceito de entropia de forma criativa',
+  },
+  {
+    label: 'Diálogo histórico',
+    prompt: 'Escreva um diálogo entre dois personagens históricos',
+  },
+  {
+    label: 'Receita maluca',
+    prompt: 'Crie uma receita maluca com ingredientes inusitados',
+  },
+];
+
 export function AdminPanel() {
   const toast = useToast();
   const [session, setSession] = useState<Session | null>(null);
@@ -49,16 +86,6 @@ export function AdminPanel() {
   const [temperature, setTemperature] = useState(0.7);
   const [deadlineMs, setDeadlineMs] = useState(120000);
   const [svgMode, setSvgMode] = useState(false);
-
-  // Predefined prompt templates
-  const promptTemplates = [
-    'Crie o SVG de uma capivara dançando frevo',
-    'Escreva uma poesia em métrica de xote pernambucano sobre IA',
-    'Conte uma história curta de ficção científica sobre robôs',
-    'Explique o conceito de entropia de forma criativa',
-    'Escreva um diálogo entre dois personagens históricos',
-    'Crie uma receita maluca com ingredientes inusitados',
-  ];
 
   // Compute round status based on startedAt/endedAt
   const getRoundStatus = (round: Round): 'pending' | 'active' | 'completed' => {
@@ -416,28 +443,26 @@ export function AdminPanel() {
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <span className="text-sm text-gray-400">Sugestões:</span>
-                  {promptTemplates.map((template, idx) => {
-                    const isSvgTemplate = template.toLowerCase().includes('svg');
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setNewPrompt(template);
-                          if (isSvgTemplate) {
-                            setSvgMode(true);
-                          }
-                        }}
-                        className={`text-xs px-2 py-1 rounded ${
-                          isSvgTemplate
-                            ? 'bg-primary/20 border border-primary text-primary hover:bg-primary/30'
-                            : 'bg-gray-600 hover:bg-gray-500'
-                        }`}
-                      >
-                        {isSvgTemplate && '🎨 '}
-                        {template.substring(0, 30)}...
-                      </button>
-                    );
-                  })}
+                  {promptTemplates.map((template) => (
+                    <button
+                      key={template.label}
+                      onClick={() => {
+                        setNewPrompt(template.prompt);
+                        setSvgMode(template.svgMode ?? false);
+                        if (template.maxTokens !== undefined) setMaxTokens(template.maxTokens);
+                        if (template.temperature !== undefined) setTemperature(template.temperature);
+                        if (template.deadlineMs !== undefined) setDeadlineMs(template.deadlineMs);
+                      }}
+                      className={`text-xs px-2 py-1 rounded ${
+                        template.svgMode
+                          ? 'bg-primary/20 border border-primary text-primary hover:bg-primary/30'
+                          : 'bg-gray-600 hover:bg-gray-500'
+                      }`}
+                    >
+                      {template.svgMode && '🎨 '}
+                      {template.label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">

@@ -21,6 +21,7 @@ model Session {
   participants Participant[]
   rounds       Round[]
   events       EventLog[]
+  stories      StoryCompetition[]
 
   @@map("sessions")
 }
@@ -58,9 +59,50 @@ model Round {
   session       Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   metrics       Metrics[]
   votes         Vote[]
+  storyChapter  StoryChapter?
 
   @@unique([sessionId, index])
   @@map("rounds")
+}
+
+model StoryCompetition {
+  id              String         @id @default(uuid())
+  sessionId       String
+  title           String
+  seedText        String
+  canonText       String
+  totalChapters   Int
+  currentChapter  Int            @default(0)
+  status          String         @default("ready") // ready, generating, voting, completed
+  maxTokens       Int            @default(500)
+  temperature     Float          @default(0.9)
+  deadlineMs      Int            @default(120000)
+  createdAt       DateTime       @default(now())
+  completedAt     DateTime?
+  session         Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  chapters        StoryChapter[]
+
+  @@map("story_competitions")
+}
+
+model StoryChapter {
+  id                   String           @id @default(uuid())
+  storyId              String
+  roundId              String           @unique
+  index                 Int
+  prompt                String
+  winningParticipantId String?
+  winningNickname      String?
+  winningContent       String?
+  winningScore         Float?
+  winningVotes         Int?
+  createdAt             DateTime         @default(now())
+  canonicalizedAt      DateTime?
+  story                 StoryCompetition @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  round                 Round            @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, index])
+  @@map("story_chapters")
 }
 
 model Metrics {
