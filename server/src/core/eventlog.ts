@@ -29,6 +29,7 @@ export type EventType =
   | 'story_voting_opened'
   | 'story_chapter_canonized'
   | 'story_chapter_cancelled'
+  | 'story_discarded'
   | 'story_completed';
 
 export type ActorType = 'admin' | 'participant' | 'voter' | 'system';

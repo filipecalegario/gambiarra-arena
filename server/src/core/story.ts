@@ -245,4 +245,19 @@ export class StoryManager {
     this.logger.info({ storyId, chapter: chapter.index }, 'Story chapter cancelled and rolled back');
     return { cancelledChapter: chapter.index };
   }
+  
+  async deleteStory(storyId: string) {
+    const story = await this.prisma.storyCompetition.findUnique({ where: { id: storyId }, include: { chapters: true } });
+    if (!story) throw new Error('História não encontrada');
+    const roundIds = story.chapters.map((chapter) => chapter.roundId);
+    await this.prisma.$transaction([
+      ...(roundIds.length ? [this.prisma.round.deleteMany({ where: { id: { in: roundIds } } })] : []),
+      this.prisma.storyCompetition.delete({ where: { id: storyId } }),
+    ]);
+    await this.eventLogger?.log({ sessionId: story.sessionId, eventType: 'story_discarded', actorType: 'admin', targetType: 'story', targetId: story.id, metadata: { title: story.title, chaptersRemoved: story.chapters.length } });
+    this.hub.broadcastToTelao({ type: 'round_started', round: 0, session_id: story.sessionId });
+    await this.broadcast(story.sessionId);
+    this.logger.info({ storyId }, 'Story discarded — ready for a fresh competition');
+    return { discarded: story.id };
+  }
 }

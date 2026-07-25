@@ -158,6 +158,14 @@ export async function setupRoutes(
     }
   });
 
+  app.post('/story/:storyId/discard', async (request, reply) => {
+    try {
+      return { status: 'ok', ...await storyManager.deleteStory((request.params as { storyId: string }).storyId) };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to discard story' });
+    }
+  });
+
   app.post('/story/:storyId/canonize', async (request, reply) => {
     try {
       const body = CanonizeSchema.parse(request.body ?? {});
