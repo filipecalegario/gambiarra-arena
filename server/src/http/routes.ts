@@ -362,10 +362,16 @@ export async function setupRoutes(
     const body = StopRoundSchema.parse(request.body);
 
     // Rescue participants whose `complete` never arrived: persist their
-    // buffered tokens as metrics so they show up in the voting page
-    const flushed = await hub.flushPendingMetrics(body.roundId);
-    if (flushed > 0) {
-      app.log.warn({ roundId: body.roundId, flushed }, 'Persisted metrics from token buffer at round stop');
+    // buffered tokens as metrics so they show up in the voting page.
+    // Nunca deixe esse resgate impedir a parada da rodada: ao vivo, parar
+    // é a operação crítica, o resgate é o bônus.
+    try {
+      const flushed = await hub.flushPendingMetrics(body.roundId);
+      if (flushed > 0) {
+        app.log.warn({ roundId: body.roundId, flushed }, 'Persisted metrics from token buffer at round stop');
+      }
+    } catch (error) {
+      app.log.error({ error, roundId: body.roundId }, 'Flush of buffered metrics failed, stopping round anyway');
     }
 
     const round = await roundManager.stopRound(body.roundId);
