@@ -3,3 +3,11 @@ packages:
   - 'client-typescript'
   - 'telao'
   # Note: server-python and client-python are Python projects, not part of pnpm workspace
+# O pnpm 11 bloqueia scripts de instalação por padrão. Estes quatro precisam
+# rodar: o Prisma gera o client e baixa as engines, o esbuild instala seu
+# binário nativo (sem eles, servidor e telão não sobem).
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
