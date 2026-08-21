@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
+import { extractSvg } from './SvgRenderer';
 
 interface Session {
   id: string;
@@ -34,6 +35,15 @@ interface Participant {
   lastSeen: string;
 }
 
+// Uma resposta de rodada anterior, para encadear no prompt da próxima
+interface ChainResponse {
+  participant_id: string;
+  nickname: string;
+  avg_score: number;
+  votes: number;
+  generated_content: string | null;
+}
+
 export function AdminPanel() {
   const toast = useToast();
   const [session, setSession] = useState<Session | null>(null);
@@ -49,6 +59,11 @@ export function AdminPanel() {
   const [temperature, setTemperature] = useState(0.7);
   const [deadlineMs, setDeadlineMs] = useState(120000);
   const [svgMode, setSvgMode] = useState(false);
+
+  // Encadeamento (telefone sem fio): respostas da rodada escolhida como origem
+  const [chainRoundId, setChainRoundId] = useState('');
+  const [chainResponses, setChainResponses] = useState<ChainResponse[]>([]);
+  const [chainLoading, setChainLoading] = useState(false);
 
   // Predefined prompt templates
   const promptTemplates = [
@@ -138,6 +153,56 @@ export function AdminPanel() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Carrega as respostas de uma rodada encerrada, já ordenadas por nota
+  const loadChainResponses = async (roundId: string) => {
+    setChainRoundId(roundId);
+    setChainResponses([]);
+    if (!roundId) return;
+
+    setChainLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/scoreboard?roundId=${roundId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setChainResponses(data.scoreboard || []);
+      } else {
+        setError('Não foi possível carregar as respostas dessa rodada');
+      }
+    } catch (err) {
+      setError('Erro de conexão ao carregar respostas');
+    } finally {
+      setChainLoading(false);
+    }
+  };
+
+  // Monta o prompt da próxima rodada a partir de uma resposta anterior.
+  // 'describe' passa o desenho adiante como texto, 'draw' devolve o texto ao desenho.
+  const chainInto = (resp: ChainResponse, mode: 'describe' | 'draw') => {
+    const content = (resp.generated_content || '').trim();
+    if (!content) {
+      setError(`${resp.nickname} não tem resposta para encadear`);
+      return;
+    }
+
+    if (mode === 'describe') {
+      // Só o SVG entra no prompt: os modelos costumam embrulhar o desenho em prosa
+      const svg = extractSvg(content) || content;
+      setNewPrompt(
+        'Abaixo está o código de um desenho em SVG. Descreva em palavras, com o máximo de detalhes visuais, a cena que esse desenho representa. Não escreva código, apenas a descrição.\n\n' + svg
+      );
+      setSvgMode(false);
+      setMaxTokens(300);
+    } else {
+      setNewPrompt(
+        'Crie um SVG que represente exatamente a cena descrita abaixo. Responda apenas com o código SVG.\n\n' + content
+      );
+      setSvgMode(true);
+      setMaxTokens(700);
+    }
+
+    toast.success(`Prompt montado a partir da resposta de ${resp.nickname}`);
   };
 
   const createRound = async () => {
@@ -440,6 +505,88 @@ export function AdminPanel() {
                   })}
                 </div>
               </div>
+              {/* Telefone sem fio: monta o prompt a partir de uma resposta anterior */}
+              <div className="p-4 bg-gray-700 rounded">
+                <label className="block mb-2 font-bold text-primary">
+                  🔗 Telefone sem fio (encadear resposta anterior)
+                </label>
+                <p className="text-sm text-gray-400 mb-3">
+                  Escolha uma rodada já encerrada, depois clique na resposta que deve seguir adiante. O prompt é montado automaticamente, sem copiar e colar.
+                </p>
+                <select
+                  value={chainRoundId}
+                  onChange={(e) => loadChainResponses(e.target.value)}
+                  className="w-full bg-gray-800 text-white p-2 rounded"
+                >
+                  <option value="">Nenhuma (prompt livre)</option>
+                  {rounds
+                    .filter((r) => r.endedAt)
+                    .sort((a, b) => b.index - a.index)
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Rodada #{r.index}{r.svgMode ? ' 🎨' : ''}: {r.prompt.slice(0, 50)}
+                      </option>
+                    ))}
+                </select>
+
+                {chainLoading && (
+                  <p className="text-sm text-gray-400 mt-3">Carregando respostas...</p>
+                )}
+
+                {!chainLoading && chainRoundId && chainResponses.length === 0 && (
+                  <p className="text-sm text-yellow-400 mt-3">
+                    Essa rodada não tem respostas registradas.
+                  </p>
+                )}
+
+                {chainResponses.length > 0 && (
+                  <div className="mt-3 space-y-2 max-h-72 overflow-auto">
+                    {chainResponses.map((resp, idx) => {
+                      const content = (resp.generated_content || '').trim();
+                      const svg = extractSvg(content);
+                      const size = (svg || content).length;
+                      return (
+                        <div
+                          key={resp.participant_id}
+                          className={`p-3 rounded ${idx === 0 ? 'bg-gray-800 border border-primary' : 'bg-gray-800'}`}
+                        >
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <span className="font-bold">
+                              {idx === 0 && '🥇 '}{resp.nickname}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              nota {resp.avg_score.toFixed(2)} ({resp.votes} voto{resp.votes !== 1 ? 's' : ''}) · {size} chars
+                              {svg && ' · SVG'}
+                            </span>
+                          </div>
+                          {size > 4000 && (
+                            <p className="text-xs text-yellow-400 mb-2">
+                              ⚠️ Resposta longa: pode estourar a janela dos modelos menores.
+                            </p>
+                          )}
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={() => chainInto(resp, 'describe')}
+                              disabled={!content}
+                              className="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-40"
+                            >
+                              🎨 ➜ 📝 Descrever este desenho
+                            </button>
+                            <button
+                              onClick={() => chainInto(resp, 'draw')}
+                              disabled={!content}
+                              className="text-xs px-3 py-1 rounded bg-purple-600 hover:bg-purple-700 disabled:opacity-40"
+                            >
+                              📝 ➜ 🎨 Desenhar esta descrição
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block mb-2">Max Tokens:</label>
